@@ -1,6 +1,12 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { marked } from "marked";
 import indexTemplate from "../template/index.html";
+import markdownTemplate from "../template/markdown.html";
+import docReadme from "../public/docs/README.md";
+import docImg from "../public/docs/img.md";
+import docIpinfo from "../public/docs/ipinfo.md";
+import docWeather from "../public/docs/weather.md";
 import * as img from "./modules/img.js";
 import * as ipinfo from "./modules/ipinfo.js";
 import * as weather from "./modules/weather.js";
@@ -16,6 +22,74 @@ const modules = [
   { id: "ipinfo", ...ipinfo.meta },
   { id: "weather", ...weather.meta },
 ];
+
+const docs = {
+  "README.md": docReadme,
+  "img.md": docImg,
+  "ipinfo.md": docIpinfo,
+  "weather.md": docWeather,
+};
+
+// 与旧版 utils/markdownRenderer.js 一致的消毒逻辑
+function escapeHtml(value) {
+  return String(value).replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character],
+  );
+}
+
+function sanitizeUrl(value, allowDataImages = false) {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  const compact = url.replace(/[\u0000-\u0020\u007f-\u009f]/g, "").toLowerCase();
+  const firstDelimiter = compact.search(/[/?#]/);
+  const prefix = firstDelimiter === -1 ? compact : compact.slice(0, firstDelimiter);
+  if (prefix.includes("&") || prefix.includes("\\")) return "";
+  const schemeMatch = compact.match(/^([a-z][a-z0-9+.-]*):/);
+  if (!schemeMatch) return url;
+  const scheme = schemeMatch[1];
+  if (allowDataImages && scheme === "data") {
+    return /^data:image\/(?:avif|gif|jpeg|png|webp);base64,/i.test(url) ? url : "";
+  }
+  const allowedSchemes = allowDataImages
+    ? new Set(["http", "https"])
+    : new Set(["http", "https", "mailto", "tel"]);
+  if (!allowedSchemes.has(scheme)) return "";
+  return url;
+}
+
+const mdRenderer = new marked.Renderer();
+mdRenderer.html = ({ text }) => escapeHtml(text);
+mdRenderer.link = ({ href, title, text }) => {
+  const safeHref = sanitizeUrl(href);
+  if (!safeHref) return text;
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+  return `<a href="${escapeHtml(safeHref)}"${titleAttr}>${text}</a>`;
+};
+mdRenderer.image = ({ href, title, text }) => {
+  const safeHref = sanitizeUrl(href, true);
+  if (!safeHref) return escapeHtml(text);
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+  return `<img src="${escapeHtml(safeHref)}" alt="${escapeHtml(text)}"${titleAttr}>`;
+};
+marked.use({ renderer: mdRenderer });
+
+function renderMarkdown(fileName, markdownContent) {
+  const htmlContent = marked.parse(markdownContent);
+  const result = markdownTemplate
+    .replace(/\$\{projectName\}/g, PROJECT_NAME)
+    .replace(/\$\{title\}/g, fileName)
+    .replace(/\$\{htmlContent\}/g, htmlContent)
+    .replace(/\$\{year\}/g, String(new Date().getFullYear()));
+  return result;
+}
 
 // 限流为 isolate 级近似实现：Workers 免费版无共享状态后端
 const hits = new Map();
@@ -114,6 +188,20 @@ function renderIndex() {
   }
   return html;
 }
+
+// 文档：/docs/*.md 渲染为 HTML，/docs/*.raw.md 直出原始 markdown
+app.get("/docs/:file", (c) => {
+  const file = c.req.param("file");
+  if (file.endsWith(".raw.md")) {
+    const name = file.slice(0, -7) + ".md";
+    if (!(name in docs)) return c.json({ error: "文档不存在" }, 404);
+    return c.body(docs[name], 200, { "Content-Type": "text/markdown; charset=utf-8" });
+  }
+  if (!file.endsWith(".md") || !(file in docs)) {
+    return c.json({ error: "文档不存在" }, 404);
+  }
+  return c.html(renderMarkdown(file, docs[file]));
+});
 
 app.get("/", (c) => c.html(renderIndex()));
 

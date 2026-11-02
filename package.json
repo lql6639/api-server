@@ -14,7 +14,8 @@
     "dry-run": "wrangler deploy --dry-run --outdir=dist"
   },
   "dependencies": {
-    "hono": "^4.6.14"
+    "hono": "^4.6.14",
+    "marked": "^12.0.2"
   },
   "devDependencies": {
     "wrangler": "^4.20.0"
