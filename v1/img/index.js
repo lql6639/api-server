@@ -152,6 +152,38 @@ function getUpstreamHeaders(orientation) {
   return { ...(base || {}), ...(h || {}) };
 }
 
+function isDirectMode() {
+  return String(config?.mode ?? "").trim().toLowerCase() === "direct";
+}
+
+function buildDirectList(orientation) {
+  const upstreamUrl = getUpstreamUrl(orientation);
+  if (!upstreamUrl) return null;
+  let path = "";
+  try {
+    path = new URL(upstreamUrl).pathname || "";
+  } catch {
+    path = "";
+  }
+  return {
+    items: [{ name: path.replace(/^\/+/, ""), path }],
+    urls: [upstreamUrl],
+    fetchedAt: Date.now(),
+    baseUrl: "",
+  };
+}
+
+async function getRandomList(orientation) {
+  if (!isDirectMode()) return getCacheNonBlocking(orientation);
+  const list = buildDirectList(orientation);
+  if (!list) {
+    const err = new Error("配置缺少upstream");
+    err.statusCode = 500;
+    throw err;
+  }
+  return list;
+}
+
 function normalizeCachedData(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   if (!Array.isArray(value.items) || !Number.isFinite(Number(value.fetchedAt)))
@@ -280,6 +312,7 @@ async function getCacheNonBlocking(orientation) {
 }
 
 function warmUp() {
+  if (isDirectMode()) return;
   startRefresh("horizontal")
     .then(() => logger.info("图片预热完成: horizontal"))
     .catch(() => {});
@@ -313,7 +346,7 @@ async function sendRandom(req, res, mode) {
 
   let c = null;
   try {
-    c = await getCacheNonBlocking(orientation);
+    c = await getRandomList(orientation);
   } catch (e) {
     const key = cacheKey(normalizeOrientation(orientation));
     let stale = null;
@@ -347,7 +380,7 @@ async function sendRandom(req, res, mode) {
   const data = {
     id: String(idx + 1),
     name: it.name,
-    url: c.baseUrl,
+    url: c.baseUrl || fullUrl,
     path: it.path,
     fullUrl,
   };
@@ -477,6 +510,15 @@ async function sendList(req, res, mode) {
   const type = getType(req.query.type, "json");
   const orientation =
     mode === "ua" ? pickOrientationByReq(req) : normalizeOrientation(mode);
+
+  if (isDirectMode()) {
+    return res.status(400).json({
+      status: "error",
+      time: Date.now(),
+      message:
+        "当前为直出模式(direct)，不支持列表，请使用 /v1/img?type=302|json|text|img",
+    });
+  }
 
   let c = null;
   try {

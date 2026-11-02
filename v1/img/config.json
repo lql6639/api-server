@@ -1,9 +1,10 @@
 {
+  "mode": "direct",
   "url": "https://api.lovlin.eu.cc/image",
   "cache_ttl": 86400,
   "upstream": {
-    "horizontal": "https://picmi.1s.fan/api/images/list?path=/background",
-    "vertical": "https://picmi.1s.fan/api/images/list?path=/background-phone"
+    "horizontal": "https://t.alcy.cc/pc",
+    "vertical": "https://t.alcy.cc/mp"
   },
   "timeout_ms": 10000,
   "max_image_bytes": 20971520

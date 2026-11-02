@@ -11,3 +11,4 @@ logs/
 *.pem
 *.key
 *.p12
+.DS_Store

@@ -136,14 +136,52 @@ function errorJson(message, status = 502) {
 }
 
 function noStore(response) {
-  response.headers.set(
-    "Cache-Control",
-    "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate",
-  );
-  return response;
+  const cacheControl =
+    "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate";
+  try {
+    response.headers.set("Cache-Control", cacheControl);
+    return response;
+  } catch {
+    // Response.redirect() 等构造出的 headers 是 immutable，需重建响应
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", cacheControl);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+}
+
+function isDirectMode() {
+  return String(imgConfig.mode ?? "").trim().toLowerCase() === "direct";
+}
+
+function buildDirectList(orientation) {
+  const o = normalizeOrientation(orientation);
+  const upstreamUrl = String(imgConfig?.upstream?.[o] || "").trim();
+  if (!upstreamUrl) return null;
+  let path = "";
+  try {
+    path = new URL(upstreamUrl).pathname || "";
+  } catch {
+    path = "";
+  }
+  return {
+    items: [{ name: path.replace(/^\/+/, ""), path }],
+    urls: [upstreamUrl],
+    fetchedAt: Date.now(),
+    baseUrl: "",
+  };
 }
 
 async function loadListOrStale(orientation) {
+  if (isDirectMode()) {
+    const direct = buildDirectList(orientation);
+    if (!direct)
+      throw Object.assign(new Error("配置缺少upstream"), { statusCode: 500 });
+    return direct;
+  }
   try {
     return await getList(orientation);
   } catch (e) {
@@ -174,7 +212,7 @@ export async function handleRandom(c, mode) {
   const data = {
     id: String(idx + 1),
     name: it.name,
-    url: list.baseUrl,
+    url: list.baseUrl || fullUrl,
     path: it.path,
     fullUrl,
   };
@@ -243,6 +281,15 @@ export async function handleRandom(c, mode) {
 export async function handleList(c, mode) {
   const type = String(c.req.query("type") || "json").trim().toLowerCase();
   const orientation = pickOrientation(c, mode);
+
+  if (isDirectMode()) {
+    return noStore(
+      errorJson(
+        "当前为直出模式(direct)，不支持列表，请使用 /v1/img?type=302|json|text|img",
+        400,
+      ),
+    );
+  }
 
   let list;
   try {
