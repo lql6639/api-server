@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import indexTemplate from "../../template/index.html";
 import * as img from "./modules/img.js";
 import * as ipinfo from "./modules/ipinfo.js";
 import * as weather from "./modules/weather.js";
@@ -98,60 +99,22 @@ app.get("/v1/weather/week", (c) => weather.handler(c, "week"));
 
 app.all("/v1/*", (c) => c.json({ error: "接口不存在" }, 404));
 
-// 首页：动态读取 meta 渲染端点列表
-app.get("/", async (c) => {
-  const rows = modules
-    .map(
-      (m) => `
-      <section>
-        <h2>${m.name}</h2>
-        <p class="desc">${m.description}</p>
-        <table>
-          <thead><tr><th>方法</th><th>路径</th><th>说明</th><th>参数</th></tr></thead>
-          <tbody>
-          ${m.endpoints
-            .map(
-              (e) =>
-                `<tr><td>${e.method}</td><td><code>/v1/${m.id}${e.path === "/" ? "" : e.path === "" ? "" : e.path}</code></td><td>${e.description}</td><td><code>${e.params || ""}</code></td></tr>`,
-            )
-            .join("")}
-          </tbody>
-        </table>
-      </section>`,
-    )
-    .join("");
+// 首页：复用 Node 版模板 template/index.html（Text 模块导入），运行时替换占位符
+function renderIndex() {
+  const vars = {
+    projectName: PROJECT_NAME,
+    maxRequests: String(RATE_LIMIT_MAX),
+    timeWindow: String(Math.round(RATE_LIMIT_WINDOW_MS / 1000)),
+    year: String(new Date().getFullYear()),
+    apiDir: API_DIR,
+  };
+  let html = indexTemplate.replace(/^\uFEFF/, "");
+  for (const [key, value] of Object.entries(vars)) {
+    html = html.split("${" + key + "}").join(value);
+  }
+  return html;
+}
 
-  const html = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${PROJECT_NAME}</title>
-<link rel="icon" href="/favicon.ico">
-<style>
-  :root { color-scheme: light dark; }
-  body { margin: 0; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; line-height: 1.6; max-width: 900px; margin-inline: auto; }
-  h1 { font-size: 28px; margin-bottom: 4px; }
-  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #2563eb; color: #fff; vertical-align: middle; margin-left: 8px; }
-  h2 { font-size: 18px; margin-bottom: 2px; }
-  .desc { margin: 0 0 10px; opacity: .7; font-size: 14px; }
-  section { margin-bottom: 32px; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(128,128,128,.25); }
-  th { font-weight: 600; opacity: .7; font-size: 13px; }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-  footer { margin-top: 40px; font-size: 13px; opacity: .6; }
-</style>
-</head>
-<body>
-<h1>${PROJECT_NAME}<span class="tag">Cloudflare Workers</span></h1>
-<p class="desc">Express 版同构移植：插件式模块、多上游容灾、边缘缓存</p>
-${rows}
-<footer>GET <code>/v1/meta</code> 获取全部端点 · 静态资源由 Workers Assets 提供</footer>
-</body>
-</html>`;
-
-  return c.html(html);
-});
+app.get("/", (c) => c.html(renderIndex()));
 
 export default app;
