@@ -66,14 +66,15 @@ function sanitizeUrl(value, allowDataImages = false) {
 }
 
 const mdRenderer = new marked.Renderer();
-mdRenderer.html = ({ text }) => escapeHtml(text);
-mdRenderer.link = ({ href, title, text }) => {
+// marked@12 的 Renderer 仍为旧签名 link(href, title, text)，text 已是内联解析后的 HTML
+mdRenderer.html = (html) => escapeHtml(html);
+mdRenderer.link = (href, title, text) => {
   const safeHref = sanitizeUrl(href);
   if (!safeHref) return text;
   const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
   return `<a href="${escapeHtml(safeHref)}"${titleAttr}>${text}</a>`;
 };
-mdRenderer.image = ({ href, title, text }) => {
+mdRenderer.image = (href, title, text) => {
   const safeHref = sanitizeUrl(href, true);
   if (!safeHref) return escapeHtml(text);
   const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
@@ -192,6 +193,8 @@ function renderIndex() {
 // 文档：/docs/*.md 渲染为 HTML，/docs/*.raw.md 直出原始 markdown
 app.get("/docs/:file", (c) => {
   const file = c.req.param("file");
+  // no-transform：阻止 Cloudflare 边缘向 HTML 注入 beacon / challenge 脚本
+  c.header("Cache-Control", "no-transform");
   if (file.endsWith(".raw.md")) {
     const name = file.slice(0, -7) + ".md";
     if (!(name in docs)) return c.json({ error: "文档不存在" }, 404);
@@ -203,6 +206,10 @@ app.get("/docs/:file", (c) => {
   return c.html(renderMarkdown(file, docs[file]));
 });
 
-app.get("/", (c) => c.html(renderIndex()));
+app.get("/", (c) => {
+  // no-transform：阻止 Cloudflare 边缘向 HTML 注入 beacon / challenge 脚本
+  c.header("Cache-Control", "no-transform");
+  return c.html(renderIndex());
+});
 
 export default app;
