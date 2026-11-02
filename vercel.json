@@ -3,14 +3,7 @@
   "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
   "functions": {
     "api/index.js": {
-      "maxDuration": 60,
-      "includeFiles": [
-        "server-config.json",
-        "v1/**",
-        "template/**",
-        "public/**",
-        "docs/**"
-      ]
+      "maxDuration": 60
     }
   }
 }
