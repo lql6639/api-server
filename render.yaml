@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: api-server
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: pnpm install --frozen-lockfile
+    startCommand: node server.js
+    healthCheckPath: /v1/meta
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # 云平台无 PM2，单进程运行；绑 0.0.0.0 才能被网关访问
+      - key: HOST
+        value: 0.0.0.0
+      - key: CLUSTER_ENABLED
+        value: "false"
+      # 平台反代后需信任 X-Forwarded-For 才能取到真实 IP
+      - key: TRUST_PROXY
+        value: "true"
+      - key: LOG_LEVEL
+        value: info
+      # 以下密钥需在 Render 控制台手动填写，不写入仓库
+      - key: BING_APP_ID
+        sync: false
+      - key: MSN_API_KEY
+        sync: false
+      - key: AMAP_API_KEY
+        sync: false
