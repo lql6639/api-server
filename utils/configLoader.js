@@ -14,6 +14,9 @@ function parseBoolean(value) {
 // 云托管平台通过环境变量注入端口/主机，需覆盖本地配置文件
 function applyEnvOverrides(config) {
   const env = process.env;
+  const isServerless = Boolean(
+    env.VERCEL || env.AWS_LAMBDA_FUNCTION_NAME || env.NETLIFY,
+  );
 
   if (env.PORT && Number(env.PORT) > 0) {
     config.port = Number(env.PORT);
@@ -24,6 +27,9 @@ function applyEnvOverrides(config) {
   if (env.TRUST_PROXY !== undefined) {
     const flag = parseBoolean(env.TRUST_PROXY);
     if (flag !== null) config.trustProxy = flag;
+  } else if (isServerless) {
+    // serverless 平台的请求都经过自家网关，不信任代理会拿不到真实客户端 IP
+    config.trustProxy = true;
   }
   if (env.CLUSTER_ENABLED !== undefined) {
     const flag = parseBoolean(env.CLUSTER_ENABLED);
@@ -39,6 +45,15 @@ function applyEnvOverrides(config) {
   }
   if (env.LOG_LEVEL) {
     config.log = { ...(config.log || {}), level: env.LOG_LEVEL };
+  }
+  if (env.LOG_FILE !== undefined) {
+    const flag = parseBoolean(env.LOG_FILE);
+    if (flag !== null) {
+      config.log = { ...(config.log || {}), file: flag };
+    }
+  } else if (isServerless && config.log && config.log.file) {
+    // serverless 文件系统只读，文件日志写不了，自动退回 console 输出
+    config.log = { ...(config.log || {}), file: false };
   }
 
   return config;

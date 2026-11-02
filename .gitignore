@@ -12,3 +12,4 @@ logs/
 *.key
 *.p12
 .DS_Store
+.vercel

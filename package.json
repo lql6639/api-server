@@ -4,6 +4,9 @@
   "author": "koizora",
   "AuthorGithub": "https://github.com/lql6639",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
