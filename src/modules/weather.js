@@ -1,6 +1,6 @@
-import weatherConfig from "../../../v1/weather/config.json" with { type: "json" };
-import cityIdData from "../../../v1/weather/week/city_id.json" with { type: "json" };
-import cmoIdData from "../../../v1/weather/week/cmo_id.json" with { type: "json" };
+import weatherConfig from "../../v1/weather/config.json" with { type: "json" };
+import cityIdData from "../../v1/weather/week/city_id.json" with { type: "json" };
+import cmoIdData from "../../v1/weather/week/cmo_id.json" with { type: "json" };
 import { cacheGet, cacheSet } from "../lib/cache.js";
 import { fetchJson } from "../lib/http.js";
 import {

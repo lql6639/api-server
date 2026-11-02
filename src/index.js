@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import indexTemplate from "../../template/index.html";
+import indexTemplate from "../template/index.html";
 import * as img from "./modules/img.js";
 import * as ipinfo from "./modules/ipinfo.js";
 import * as weather from "./modules/weather.js";

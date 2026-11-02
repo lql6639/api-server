@@ -1,9 +1,8 @@
 /temp
 /node_modules
-/node_modules/
-workers/node_modules/
-workers/dist/
-workers/.wrangler/
+node_modules/
+dist/
+.wrangler/
 logs/
 .env
 .env.*

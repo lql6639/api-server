@@ -1,7 +1,0 @@
-packages:
-  - "."
-
-# 允许 esbuild / workerd 执行构建脚本（wrangler 打包依赖这两个二进制）
-allowBuilds:
-  esbuild: true
-  workerd: true

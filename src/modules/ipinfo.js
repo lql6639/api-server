@@ -1,4 +1,4 @@
-import ipinfoConfig from "../../../v1/ipinfo/config.json" with { type: "json" };
+import ipinfoConfig from "../../v1/ipinfo/config.json" with { type: "json" };
 import { cacheGet, cacheSet, dedupe } from "../lib/cache.js";
 import { fetchJson } from "../lib/http.js";
 import {

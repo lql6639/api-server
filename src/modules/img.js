@@ -1,4 +1,4 @@
-import imgConfig from "../../../v1/img/config.json" with { type: "json" };
+import imgConfig from "../../v1/img/config.json" with { type: "json" };
 import { cacheGet, cacheSet, dedupe } from "../lib/cache.js";
 import { fetchJson, fetchRaw, BROWSER_UA } from "../lib/http.js";
 
