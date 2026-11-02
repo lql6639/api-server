@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${code} | ${projectName}</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #fafafa;
+      color: #18181b;
+      font-family: 'Inter', -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: #09090b;
+        color: #e4e4e7;
+      }
+
+      .error-code {
+        color: #52525b;
+      }
+
+      .message {
+        color: #a1a1aa;
+      }
+
+      .info-card {
+        background: #18181b;
+        border-color: #27272a;
+      }
+
+      .info-label {
+        color: #71717a;
+      }
+
+      .info-value {
+        color: #e4e4e7;
+      }
+
+      .back-btn {
+        background: #2563eb;
+      }
+
+      .back-btn:hover {
+        background: #3b82f6;
+      }
+
+      footer {
+        border-top-color: #27272a;
+        color: #52525b;
+      }
+
+      footer a {
+        color: #52525b;
+      }
+    }
+
+    .container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .error-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 72px;
+      font-weight: 600;
+      color: #d4d4d8;
+      line-height: 1;
+      margin-bottom: 16px;
+    }
+
+    .message {
+      font-size: 16px;
+      color: #71717a;
+      margin-bottom: 32px;
+      max-width: 400px;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-decoration: none;
+    }
+
+    .back-btn:hover {
+      background: #3b82f6;
+    }
+
+    .info-card {
+      background: #fff;
+      border: 1px solid #e4e4e7;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 32px;
+      min-width: 280px;
+      text-align: left;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+    }
+
+    .info-row+.info-row {
+      border-top: 1px solid #f4f4f5;
+    }
+
+    .info-label {
+      font-size: 13px;
+      color: #71717a;
+    }
+
+    .info-value {
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e4e4e7;
+      font-size: 12px;
+      color: #a1a1aa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    footer a {
+      color: #a1a1aa;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      color: #71717a;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <div class="error-code">${code}</div>
+    <div class="message">${description}</div>
+    <a href="/" class="back-btn">
+      <svg style="width:16px;height:16px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      返回首页
+    </a>
+    <div class="info-card" id="infoCard" style="display:none;">
+      <div class="info-row">
+        <span class="info-label">IP</span>
+        <span class="info-value" id="userIp">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">位置</span>
+        <span class="info-value" id="userLocation">-</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Copyright &copy; <span id="year"></span> ${projectName}</span>
+    <a href="https://lovlin.eu.cc" target="_blank">koizora</a>
+  </footer>
+
+  <script>
+
+    const styleTitle1 = "font-size: 20px;font-weight: 600;color: rgb(244,167,89);";
+    const styleTitle2 = "font-size:12px;color: rgb(244,167,89);";
+    const styleContent = "color: rgb(30,152,255);";
+    const title1 = "Lovlin_0206 の API";
+    const title2 = `
+    __  __  _  _____  _____  _   _   ____
+    |  \\/  |(_)|  ___|| ____|| \\ | | / ___|
+    | |\\/| || || |_   |  _|  |  \\| || |  _
+    | |  | || ||  _|  | |___ | |\\  || |_| |
+    |_|  |_||_||_|    |_____||_| \\_| \\____|`;
+    const content = `\n\n版本: 6.0.0\nAuthor: koizora & Github: https://github.com/lql6639`;
+    console.info(
+      `%c${title1} %c${title2} %c${content}`,
+      styleTitle1,
+      styleTitle2,
+      styleContent,
+    );
+
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    fetch('/v1/ipinfo')
+      .then(function (res) { return res.json(); })
+      .then(function (result) {
+        var data = result && result.data;
+        if (!data) return;
+        var ip = data.ip || '';
+        var city = data.city || '';
+        var prov = data.prov || '';
+        var loc = [city, prov].filter(Boolean).join(' ');
+        if (ip || loc) {
+          document.getElementById('infoCard').style.display = '';
+          if (ip) document.getElementById('userIp').textContent = ip;
+          if (loc) document.getElementById('userLocation').textContent = loc;
+        }
+      })
+      .catch(function () { });
+  </script>
+</body>
+
+</html>

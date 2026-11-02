@@ -1,0 +1,32 @@
+{
+  "bing": {
+    "url": "https://cn.bing.com/api/v6/Places/AutoSuggest?appid={appid}&structuredaddress=true&q={city}",
+    "enabled": true
+  },
+  "msn": {
+    "url": "https://api.msn.cn/weatherfalcon/weather/current?apikey={apikey}&cm=zh-cn&latLongList={value.geo.latitude,value.geo.longitude}",
+    "enabled": true
+  },
+  "amap": {
+    "url": "https://restapi.amap.com/v3/weather/weatherInfo?key={key}&city={city}",
+    "enabled": true
+  },
+  "vmy": {
+    "url": "https://api.52vmy.cn/api/query/tian?city={city}",
+    "enabled": false
+  },
+  "suyan": {
+    "url": "https://api.suyanw.cn/api/weather.php?city={city}",
+    "enabled": true
+  },
+  "cma": {
+    "url": "https://weather.cma.cn/api/weather/view?stationid={cmo_id}",
+    "enabled": true
+  },
+  "sojson": {
+    "url": "http://t.weather.sojson.com/api/weather/city/{city_id}",
+    "enabled": true
+  },
+  "week_cache_ttl": 3600,
+  "vmy_queue_limit": 100
+}

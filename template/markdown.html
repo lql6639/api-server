@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} | ${projectName}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #fafafa;
+      color: #18181b;
+      font-family: 'Inter', -apple-system, sans-serif;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: #09090b;
+        color: #e4e4e7;
+      }
+
+      .content h1,
+      .content h2 {
+        border-bottom-color: #27272a;
+      }
+
+      .content blockquote {
+        border-left-color: #27272a;
+        background: #18181b;
+        color: #71717a;
+      }
+
+      .content pre {
+        background: #1c1c1e;
+        border-color: #27272a;
+      }
+
+      .content code {
+        background: #1c1c1e;
+      }
+
+      .content table,
+      .content th,
+      .content td {
+        border-color: #27272a;
+      }
+
+      .content th {
+        background: #18181b;
+      }
+
+      .content tr:hover {
+        background: #1c1c1e;
+      }
+
+      .content a {
+        color: #60a5fa;
+      }
+
+      .navbar {
+        border-bottom-color: #27272a;
+      }
+
+      .navbar a {
+        color: #71717a;
+      }
+
+      .navbar a:hover {
+        color: #e4e4e7;
+      }
+
+      footer {
+        border-top-color: #27272a;
+        color: #52525b;
+      }
+
+      .copy-btn {
+        background: #27272a;
+        color: #a1a1aa;
+      }
+
+      .copy-btn:hover {
+        background: #3f3f46;
+      }
+    }
+
+    .navbar {
+      position: sticky;
+      top: 0;
+      background: rgba(250, 250, 250, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e4e4e7;
+      padding: 12px 0;
+      z-index: 100;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .navbar {
+        background: rgba(9, 9, 11, 0.95);
+      }
+    }
+
+    .navbar-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #18181b;
+      text-decoration: none;
+    }
+
+    .navbar-brand:hover {
+      text-decoration: none;
+    }
+
+    .navbar-links {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+    }
+
+    .navbar-links a {
+      color: #71717a;
+    }
+
+    .navbar-links a:hover {
+      color: #18181b;
+      text-decoration: none;
+    }
+
+    .content {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 32px 24px 60px;
+    }
+
+    .content h1 {
+      font-size: 1.875em;
+      font-weight: 600;
+      margin: 32px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e4e4e7;
+    }
+
+    .content h1:first-child {
+      margin-top: 0;
+    }
+
+    .content h2 {
+      font-size: 1.375em;
+      font-weight: 600;
+      margin: 32px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e4e4e7;
+    }
+
+    .content h3 {
+      font-size: 1.125em;
+      font-weight: 600;
+      margin: 24px 0 8px;
+    }
+
+    .content p {
+      margin: 0 0 16px;
+    }
+
+    .content ul,
+    .content ol {
+      margin: 0 0 16px;
+      padding-left: 24px;
+    }
+
+    .content li {
+      margin-bottom: 4px;
+    }
+
+    .content a {
+      color: #2563eb;
+    }
+
+    .content a:hover {
+      text-decoration: underline;
+    }
+
+    .content code {
+      font-family: 'JetBrains Mono', monospace;
+      background: #f4f4f5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.875em;
+    }
+
+    .content pre {
+      background: #f4f4f5;
+      border: 1px solid #e4e4e7;
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 0 0 16px;
+      position: relative;
+    }
+
+    .content pre code {
+      background: none;
+      padding: 0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .content blockquote {
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-left: 3px solid #e4e4e7;
+      background: #f9fafb;
+      color: #71717a;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 16px;
+      font-size: 14px;
+    }
+
+    .content th,
+    .content td {
+      border: 1px solid #e4e4e7;
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    .content th {
+      background: #f9fafb;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .content tr:hover {
+      background: #f9fafb;
+    }
+
+    .content hr {
+      border: none;
+      border-top: 1px solid #e4e4e7;
+      margin: 24px 0;
+    }
+
+    .content img {
+      max-width: 100%;
+      border-radius: 6px;
+    }
+
+    footer {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      border-top: 1px solid #e4e4e7;
+      font-size: 12px;
+      color: #a1a1aa;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    footer a {
+      color: #a1a1aa;
+    }
+
+    footer a:hover {
+      color: #71717a;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: #e4e4e7;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #52525b;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .content pre:hover .copy-btn {
+      opacity: 1;
+    }
+
+    .copy-btn:hover {
+      background: #d4d4d8;
+    }
+
+    .copy-btn.copied {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    @media (max-width: 768px) {
+      .content {
+        padding: 24px 16px 40px;
+      }
+
+      .content h1 {
+        font-size: 1.5em;
+      }
+
+      .content h2 {
+        font-size: 1.25em;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a href="/" class="navbar-brand">
+        <svg style="width:14px;height:14px;vertical-align:-1px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        ${projectName}
+      </a>
+      <div class="navbar-links">
+        <a href="/">首页</a>
+        <a href="/docs/README.md">文档</a>
+        <a href="https://github.com/lql6639/api-server" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="content">
+    ${htmlContent}
+  </div>
+
+  <footer>
+    <span>Copyright &copy; ${year} Lovlin_0206</span>
+    <a href="https://lovlin.eu.cc" target="_blank">Lovlin_0206</a>
+  </footer>
+
+  <script>
+
+    const styleTitle1 = "font-size: 20px;font-weight: 600;color: rgb(244,167,89);";
+    const styleTitle2 = "font-size:12px;color: rgb(244,167,89);";
+    const styleContent = "color: rgb(30,152,255);";
+    const title1 = "Lovlin_0206 の API";
+    const title2 = `
+    __  __  _  _____  _____  _   _   ____
+    |  \\/  |(_)|  ___|| ____|| \\ | | / ___|
+    | |\\/| || || |_   |  _|  |  \\| || |  _
+    | |  | || ||  _|  | |___ | |\\  || |_| |
+    |_|  |_||_||_|    |_____||_| \\_| \\____|`;
+    const content = `\n\n版本: 6.0.0\nAuthor: koizora & Github: https://github.com/lql6639`;
+    console.info(
+      `%c${title1} %c${title2} %c${content}`,
+      styleTitle1,
+      styleTitle2,
+      styleContent,
+    );
+
+    document.querySelectorAll('pre').forEach(pre => {
+      const btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = '复制';
+      pre.appendChild(btn);
+      btn.addEventListener('click', () => {
+        const code = pre.querySelector('code');
+        navigator.clipboard.writeText(code.innerText).then(() => {
+          btn.textContent = '已复制';
+          btn.classList.add('copied');
+          setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 2000);
+        });
+      });
+    });
+  </script>
+</body>
+
+</html>

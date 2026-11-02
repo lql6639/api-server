@@ -1,0 +1,33 @@
+[
+  {
+    "id": "api-server",
+    "command-working-directory": "/opt/api-server",
+    "response-message": "deploying",
+    "execute-command": "/bin/bash",
+    "pass-arguments-to-command": [{ "source": "string", "name": "deploy.sh" }],
+    "trigger-rule": {
+      "and": [
+        {
+          "match": {
+            "type": "payload-hash-sha256",
+            "secret": "YOUR_WEBHOOK_SECRET",
+            "parameter": {
+              "source": "header",
+              "name": "X-Hub-Signature-256"
+            }
+          }
+        },
+        {
+          "match": {
+            "type": "value",
+            "value": "refs/heads/main",
+            "parameter": {
+              "source": "payload",
+              "name": "ref"
+            }
+          }
+        }
+      ]
+    }
+  }
+]
