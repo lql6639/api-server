@@ -59,6 +59,41 @@ function applyEnvOverrides(config) {
   return config;
 }
 
+// serverless 平台可能因为打包裁剪拿不到配置文件，此时用内置默认值继续服务，
+// 而不是让整个函数 crash（process.exit 在 Lambda 里等于一次失败调用）
+function defaultConfig() {
+  return {
+    projectName: "API Server",
+    host: "127.0.0.1",
+    port: 8633,
+    trustProxy: "loopback",
+    staticDir: "public",
+    apiDir: "v1",
+    index: { templatePath: "template/index.html" },
+    error: { templatePath: "template/error.html" },
+    markdown: { templatePath: "template/markdown.html" },
+    log: { level: "info", file: false, dir: "logs" },
+    rateLimit: { enabled: true, timeWindow: 60, maxRequests: 100 },
+    cluster: { enabled: false, workers: 0 },
+    redis: {
+      enabled: false,
+      host: "127.0.0.1",
+      port: 6379,
+      password: "",
+      db: 0,
+      keyPrefix: "api-server:",
+    },
+  };
+}
+
+function isServerlessEnv() {
+  return Boolean(
+    process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.NETLIFY,
+  );
+}
+
 function loadConfig() {
   if (cachedConfig) {
     return cachedConfig;
@@ -76,6 +111,13 @@ function loadConfig() {
     } else {
       console.error("[错误] 无法读取配置文件:", error);
     }
+
+    if (isServerlessEnv()) {
+      console.error("[警告] serverless 环境下改用内置默认配置继续启动");
+      cachedConfig = applyEnvOverrides(defaultConfig());
+      return cachedConfig;
+    }
+
     process.exit(1);
   }
 }
