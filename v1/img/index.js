@@ -124,13 +124,19 @@ function isCacheFresh(data, now, ttl) {
   return now - (data.fetchedAt || 0) < ttl;
 }
 
-function getUpstreamUrl(orientation) {
+function getUpstreamCandidates(orientation) {
   const o = normalizeOrientation(orientation);
   const upstream =
     config?.upstream && typeof config.upstream === "object"
       ? config.upstream
       : null;
-  return upstream ? String(upstream[o] || "").trim() : "";
+  const raw = upstream ? upstream[o] : "";
+  const list = Array.isArray(raw) ? raw : [raw];
+  return list.map((v) => String(v ?? "").trim()).filter(Boolean);
+}
+
+function getUpstreamUrl(orientation) {
+  return getUpstreamCandidates(orientation)[0] || "";
 }
 
 function getUpstreamHeaders(orientation) {
@@ -157,17 +163,20 @@ function isDirectMode() {
 }
 
 function buildDirectList(orientation) {
-  const upstreamUrl = getUpstreamUrl(orientation);
-  if (!upstreamUrl) return null;
-  let path = "";
-  try {
-    path = new URL(upstreamUrl).pathname || "";
-  } catch {
-    path = "";
-  }
+  const candidates = getUpstreamCandidates(orientation);
+  if (candidates.length === 0) return null;
+  const items = candidates.map((url) => {
+    let path = "";
+    try {
+      path = new URL(url).pathname || "";
+    } catch {
+      path = "";
+    }
+    return { name: path.replace(/^\/+/, ""), path };
+  });
   return {
-    items: [{ name: path.replace(/^\/+/, ""), path }],
-    urls: [upstreamUrl],
+    items,
+    urls: candidates,
     fetchedAt: Date.now(),
     baseUrl: "",
   };
@@ -339,6 +348,81 @@ function buildListResponseData(c) {
   }));
 }
 
+async function proxyImage(res, imageUrl) {
+  const timeout = Number(config?.timeout_ms) || 10000;
+  const configuredMax = Number(config?.max_image_bytes);
+  const maxImageBytes =
+    configuredMax > 0 ? configuredMax : DEFAULT_MAX_IMAGE_BYTES;
+
+  const r = await http.axios.get(imageUrl, {
+    responseType: "stream",
+    timeout,
+    maxContentLength: maxImageBytes,
+    maxBodyLength: maxImageBytes,
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0",
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    },
+    validateStatus: () => true,
+  });
+
+  if (!r || !r.data) {
+    const err = new Error("图片响应为空");
+    err.statusCode = 502;
+    throw err;
+  }
+
+  const status = Number(r.status) || 502;
+  const contentType = String(r.headers?.["content-type"] || "").trim();
+  const mimeType = contentType.split(";", 1)[0].toLowerCase();
+  const contentLength = Number(r.headers?.["content-length"]);
+
+  // 校验必须在写入响应头之前完成，失败时才能切换到下一个上游
+  if (status < 200 || status >= 300) {
+    r.data.destroy();
+    throw new Error("图片上游响应异常");
+  }
+  if (!mimeType.startsWith("image/") || mimeType === "image/svg+xml") {
+    r.data.destroy();
+    throw new Error("图片上游返回了非图片内容");
+  }
+  if (Number.isFinite(contentLength) && contentLength > maxImageBytes) {
+    r.data.destroy();
+    throw new Error("图片大小超过限制");
+  }
+
+  res.status(status);
+  res.set("Content-Type", contentType);
+  res.set("X-Content-Type-Options", "nosniff");
+  if (Number.isFinite(contentLength) && contentLength >= 0) {
+    res.set("Content-Length", String(contentLength));
+  }
+  if (r.headers && r.headers["etag"]) res.set("ETag", String(r.headers["etag"]));
+
+  let transferredBytes = 0;
+  r.data.on("data", (chunk) => {
+    transferredBytes += chunk.length;
+    if (transferredBytes > maxImageBytes) {
+      r.data.destroy(new Error("图片大小超过限制"));
+    }
+  });
+  r.data.on("error", (e) => {
+    logger.error(`流式传输错误: ${e?.message || e}`);
+    if (!res.headersSent) res.status(502).end("图片传输失败");
+    else res.end();
+  });
+  if (typeof res.once === "function") {
+    res.once("close", () => {
+      if (!res.writableEnded && !r.data.destroyed) {
+        r.data.destroy();
+      }
+    });
+  }
+
+  r.data.pipe(res);
+}
+
 async function sendRandom(req, res, mode) {
   const type = getType(req.query.type, "302");
   const orientation =
@@ -374,7 +458,10 @@ async function sendRandom(req, res, mode) {
       .json({ status: "error", time: Date.now(), message: "未获取到图片列表" });
   }
 
-  const idx = Math.floor(Math.random() * c.urls.length);
+  // 直出模式按主备顺序取第一个（失败再切下一个）；列表模式随机取
+  const idx = isDirectMode()
+    ? 0
+    : Math.floor(Math.random() * c.urls.length);
   const fullUrl = c.urls[idx];
   const it = c.items[idx] || { name: "", path: "" };
   const data = {
@@ -389,105 +476,23 @@ async function sendRandom(req, res, mode) {
     return res.redirect(302, fullUrl);
   }
   if (type === "img") {
-    try {
-      const timeout = Number(config?.timeout_ms) || 10000;
-      const configuredMax = Number(config?.max_image_bytes);
-      const maxImageBytes =
-        configuredMax > 0 ? configuredMax : DEFAULT_MAX_IMAGE_BYTES;
-      const r = await http.axios.get(fullUrl, {
-        responseType: "stream",
-        timeout,
-        maxContentLength: maxImageBytes,
-        maxBodyLength: maxImageBytes,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0",
-          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        },
-        validateStatus: () => true,
-      });
-
-      if (!r || !r.data) {
-        return res
-          .status(502)
-          .json({ status: "error", time: Date.now(), message: "图片响应为空" });
+    const total = c.urls.length;
+    let lastError = null;
+    for (let i = 0; i < total; i++) {
+      const candidate = c.urls[(idx + i) % total];
+      try {
+        await proxyImage(res, candidate);
+        return;
+      } catch (e) {
+        lastError = e;
+        if (res.headersSent) return;
       }
-
-      const status = Number(r.status) || 502;
-      const contentType = String(r.headers?.["content-type"] || "").trim();
-      const mimeType = contentType.split(";", 1)[0].toLowerCase();
-      const contentLength = Number(r.headers?.["content-length"]);
-      if (status < 200 || status >= 300) {
-        r.data.destroy();
-        return res
-          .status(502)
-          .json({
-            status: "error",
-            time: Date.now(),
-            message: "图片上游响应异常",
-          });
-      }
-      if (!mimeType.startsWith("image/") || mimeType === "image/svg+xml") {
-        r.data.destroy();
-        return res
-          .status(502)
-          .json({
-            status: "error",
-            time: Date.now(),
-            message: "图片上游返回了非图片内容",
-          });
-      }
-      if (Number.isFinite(contentLength) && contentLength > maxImageBytes) {
-        r.data.destroy();
-        return res
-          .status(502)
-          .json({
-            status: "error",
-            time: Date.now(),
-            message: "图片大小超过限制",
-          });
-      }
-
-      res.status(status);
-      res.set("Content-Type", contentType);
-      res.set("X-Content-Type-Options", "nosniff");
-      if (Number.isFinite(contentLength) && contentLength >= 0) {
-        res.set("Content-Length", String(contentLength));
-      }
-      if (r.headers && r.headers["etag"])
-        res.set("ETag", String(r.headers["etag"]));
-
-      let transferredBytes = 0;
-      r.data.on("data", (chunk) => {
-        transferredBytes += chunk.length;
-        if (transferredBytes > maxImageBytes) {
-          r.data.destroy(new Error("图片大小超过限制"));
-        }
-      });
-      r.data.on("error", (e) => {
-        logger.error(`流式传输错误: ${e?.message || e}`);
-        if (!res.headersSent) res.status(502).end("图片传输失败");
-        else res.end();
-      });
-      if (typeof res.once === "function") {
-        res.once("close", () => {
-          if (!res.writableEnded && !r.data.destroyed) {
-            r.data.destroy();
-          }
-        });
-      }
-
-      r.data.pipe(res);
-      return;
-    } catch (e) {
-      return res
-        .status(502)
-        .json({
-          status: "error",
-          time: Date.now(),
-          message: String(e?.message || e),
-        });
     }
+    return res.status(502).json({
+      status: "error",
+      time: Date.now(),
+      message: String(lastError?.message || "图片上游不可用"),
+    });
   }
   if (type === "text") {
     res.type("text/plain; charset=utf-8");

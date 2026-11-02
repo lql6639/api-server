@@ -153,23 +153,66 @@ function noStore(response) {
   }
 }
 
+async function proxyImage(imageUrl) {
+  const maxBytes =
+    Number(imgConfig.max_image_bytes) > 0
+      ? Number(imgConfig.max_image_bytes)
+      : DEFAULT_MAX_IMAGE_BYTES;
+
+  const upstream = await fetchRaw(imageUrl, {
+    timeout: Number(imgConfig.timeout_ms) || 10000,
+    headers: {
+      "User-Agent": BROWSER_UA,
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    },
+  });
+
+  if (!upstream.ok) throw new Error("图片上游响应异常");
+
+  const contentType = String(upstream.headers.get("content-type") || "").trim();
+  const mime = contentType.split(";")[0].toLowerCase();
+  if (!mime.startsWith("image/") || mime === "image/svg+xml") {
+    throw new Error("图片上游返回了非图片内容");
+  }
+  const len = Number(upstream.headers.get("content-length"));
+  if (Number.isFinite(len) && len > maxBytes) {
+    throw new Error("图片大小超过限制");
+  }
+
+  const headers = new Headers({
+    "Content-Type": contentType,
+    "X-Content-Type-Options": "nosniff",
+  });
+  if (Number.isFinite(len) && len >= 0) headers.set("Content-Length", String(len));
+  const etag = upstream.headers.get("etag");
+  if (etag) headers.set("ETag", etag);
+
+  return new Response(upstream.body, { status: upstream.status, headers });
+}
+
 function isDirectMode() {
   return String(imgConfig.mode ?? "").trim().toLowerCase() === "direct";
 }
 
 function buildDirectList(orientation) {
   const o = normalizeOrientation(orientation);
-  const upstreamUrl = String(imgConfig?.upstream?.[o] || "").trim();
-  if (!upstreamUrl) return null;
-  let path = "";
-  try {
-    path = new URL(upstreamUrl).pathname || "";
-  } catch {
-    path = "";
-  }
+  const raw = imgConfig?.upstream?.[o];
+  const candidates = (Array.isArray(raw) ? raw : [raw])
+    .map((v) => String(v ?? "").trim())
+    .filter(Boolean);
+  if (candidates.length === 0) return null;
+  const items = candidates.map((u) => {
+    let path = "";
+    try {
+      path = new URL(u).pathname || "";
+    } catch {
+      path = "";
+    }
+    return { name: path.replace(/^\/+/, ""), path };
+  });
   return {
-    items: [{ name: path.replace(/^\/+/, ""), path }],
-    urls: [upstreamUrl],
+    items,
+    urls: candidates,
     fetchedAt: Date.now(),
     baseUrl: "",
   };
@@ -206,7 +249,10 @@ export async function handleRandom(c, mode) {
     return noStore(errorJson("未获取到图片列表"));
   }
 
-  const idx = Math.floor(Math.random() * list.urls.length);
+  // 直出模式按主备顺序取第一个（失败再切下一个）；列表模式随机取
+  const idx = isDirectMode()
+    ? 0
+    : Math.floor(Math.random() * list.urls.length);
   const fullUrl = list.urls[idx];
   const it = list.items[idx] || { name: "", path: "" };
   const data = {
@@ -234,45 +280,16 @@ export async function handleRandom(c, mode) {
   }
 
   if (type === "img") {
-    const maxBytes =
-      Number(imgConfig.max_image_bytes) > 0
-        ? Number(imgConfig.max_image_bytes)
-        : DEFAULT_MAX_IMAGE_BYTES;
-    let upstream;
-    try {
-      upstream = await fetchRaw(fullUrl, {
-        timeout: Number(imgConfig.timeout_ms) || 10000,
-        headers: {
-          "User-Agent": BROWSER_UA,
-          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        },
-      });
-    } catch (e) {
-      return noStore(errorJson(String(e?.message || e)));
+    const total = list.urls.length;
+    let lastError = null;
+    for (let i = 0; i < total; i++) {
+      try {
+        return noStore(await proxyImage(list.urls[(idx + i) % total]));
+      } catch (e) {
+        lastError = e;
+      }
     }
-
-    if (!upstream.ok) return noStore(errorJson("图片上游响应异常"));
-
-    const contentType = String(upstream.headers.get("content-type") || "").trim();
-    const mime = contentType.split(";")[0].toLowerCase();
-    if (!mime.startsWith("image/") || mime === "image/svg+xml") {
-      return noStore(errorJson("图片上游返回了非图片内容"));
-    }
-    const len = Number(upstream.headers.get("content-length"));
-    if (Number.isFinite(len) && len > maxBytes) {
-      return noStore(errorJson("图片大小超过限制"));
-    }
-
-    const headers = new Headers({
-      "Content-Type": contentType,
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "no-store",
-    });
-    if (Number.isFinite(len) && len >= 0) headers.set("Content-Length", String(len));
-    const etag = upstream.headers.get("etag");
-    if (etag) headers.set("ETag", etag);
-
-    return new Response(upstream.body, { status: upstream.status, headers });
+    return noStore(errorJson(String(lastError?.message || "图片上游不可用")));
   }
 
   return noStore(errorJson("type仅支持text/json/302/img", 400));
