@@ -8,7 +8,8 @@ import {
   ipv6Prefix48,
 } from "../lib/ip.js";
 
-const CACHE_PREFIX = "ipinfo:";
+// 带版本前缀，改选源策略后让旧的「广州」缓存自然失效
+const CACHE_PREFIX = "ipinfo:p1:";
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 const IP_VERSION_VALUES = new Map([
   ["ipv4", 4],
@@ -70,6 +71,11 @@ function selectNextApi(available) {
   if (!available || available.length === 0) return null;
   if (available.length === 1) return available[0];
   const strategy = ipinfoConfig.load_balance_strategy || "round_robin";
+  // priority：严格按 config.json 里 upstream_apis 的书写顺序选源，
+  // 前一个失败（超时/报错）才顺延到下一个，便于手工调整优先级
+  if (strategy === "priority") {
+    return available[0];
+  }
   if (strategy === "random") {
     return available[Math.floor(Math.random() * available.length)];
   }
