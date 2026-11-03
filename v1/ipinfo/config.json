@@ -45,6 +45,24 @@
   ],
   "upstream_apis": [
     {
+      "name": "ip9",
+      "url": "https://ip9.com.cn/get?ip={ip}",
+      "max_requests": 50,
+      "time_window": 60,
+      "enabled": true,
+      "ip_versions": "IPv4",
+      "field_mapping": {
+        "ip": "data.ip",
+        "prov": "data.prov",
+        "city": "data.city",
+        "country": "data.country",
+        "country_code": "country_code",
+        "isp": "data.isp",
+        "lon": "data.lng",
+        "lat": "data.lat"
+      }
+    },
+    {
       "name": "ip-api",
       "url": "http://ip-api.com/json/{ip}?lang=zh-CN&fields=status,message,country,countryCode,regionName,city,isp,lat,lon",
       "max_requests": 40,
@@ -60,24 +78,6 @@
         "isp": "isp",
         "lon": "lon",
         "lat": "lat"
-      }
-    },
-    {
-      "name": "ip9",
-      "url": "https://ip9.com.cn/get?ip={ip}",
-      "max_requests": 50,
-      "time_window": 60,
-      "enabled": true,
-      "ip_versions": "IPv6,IPv4",
-      "field_mapping": {
-        "ip": "data.ip",
-        "prov": "data.prov",
-        "city": "data.city",
-        "country": "data.country",
-        "country_code": "country_code",
-        "isp": "data.isp",
-        "lon": "data.lng",
-        "lat": "data.lat"
       }
     }
   ]
