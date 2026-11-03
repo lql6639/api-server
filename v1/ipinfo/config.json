@@ -64,24 +64,6 @@
       }
     },
     {
-      "name": "ip-api",
-      "url": "http://ip-api.com/json/{ip}",
-      "max_requests": 40,
-      "time_window": 60,
-      "enabled": true,
-      "ip_versions": "IPv6",
-      "field_mapping": {
-        "ip": "{ip}",
-        "prov": "regionName",
-        "city": "city",
-        "country": "country",
-        "country_code": "countryCode",
-        "isp": "isp",
-        "lon": "lon",
-        "lat": "lat"
-      }
-    },
-    {
       "name": "ip9",
       "url": "https://ip9.com.cn/get?ip={ip}",
       "max_requests": 50,
@@ -115,44 +97,6 @@
         "isp": "{ip}.carrier",
         "lon": "{ip}.longitude",
         "lat": "{ip}.latitude"
-      }
-    },
-    {
-      "name": "songzixian",
-      "url": "https://api.songzixian.com/api/ip?dataSource=GLOBAL_IP&ip={ip}",
-      "max_requests": 120,
-      "time_window": 60,
-      "enabled": false,
-      "ip_versions": "IPv6,IPv4",
-      "field_mapping": {
-        "ip": "data.ip",
-        "prov": "data.province",
-        "city": "data.city",
-        "district": "data.district",
-        "country_code": "data.countryCode",
-        "country": "data.country",
-        "isp": "data.isp",
-        "lon": "data.longitude",
-        "lat": "data.latitude"
-      }
-    },
-    {
-      "name": "52vmy",
-      "url": "https://api.52vmy.cn/api/query/itad/pro?ip={ip}",
-      "max_requests": 50,
-      "time_window": 60,
-      "enabled": false,
-      "ip_versions": "IPv6,IPv4",
-      "field_mapping": {
-        "ip": "ip",
-        "prov": "data.province",
-        "city": "data.city",
-        "district": "data.district",
-        "country": "data.country",
-        "country_code": "data.countryCode",
-        "isp": "data.isp",
-        "lon": "data.longitude",
-        "lat": "data.latitude"
       }
     }
   ]
