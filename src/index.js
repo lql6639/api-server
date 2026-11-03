@@ -48,15 +48,20 @@ function escapeHtml(value) {
 function sanitizeUrl(value, allowDataImages = false) {
   const url = String(value || "").trim();
   if (!url) return "";
-  const compact = url.replace(/[\u0000-\u0020\u007f-\u009f]/g, "").toLowerCase();
+  const compact = url
+    .replace(/[\u0000-\u0020\u007f-\u009f]/g, "")
+    .toLowerCase();
   const firstDelimiter = compact.search(/[/?#]/);
-  const prefix = firstDelimiter === -1 ? compact : compact.slice(0, firstDelimiter);
+  const prefix =
+    firstDelimiter === -1 ? compact : compact.slice(0, firstDelimiter);
   if (prefix.includes("&") || prefix.includes("\\")) return "";
   const schemeMatch = compact.match(/^([a-z][a-z0-9+.-]*):/);
   if (!schemeMatch) return url;
   const scheme = schemeMatch[1];
   if (allowDataImages && scheme === "data") {
-    return /^data:image\/(?:avif|gif|jpeg|png|webp);base64,/i.test(url) ? url : "";
+    return /^data:image\/(?:avif|gif|jpeg|png|webp);base64,/i.test(url)
+      ? url
+      : "";
   }
   const allowedSchemes = allowDataImages
     ? new Set(["http", "https"])
@@ -118,7 +123,14 @@ app.use("*", async (c, next) => {
   );
 });
 
-app.use("*", cors({ origin: "*", allowMethods: ["GET", "HEAD", "OPTIONS"], maxAge: 86400 }));
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    allowMethods: ["GET", "HEAD", "OPTIONS"],
+    maxAge: 86400,
+  }),
+);
 
 app.use("/v1/*", async (c, next) => {
   const rid = crypto.randomUUID().slice(0, 12);
@@ -198,7 +210,9 @@ app.get("/docs/:file", (c) => {
   if (file.endsWith(".raw.md")) {
     const name = file.slice(0, -7) + ".md";
     if (!(name in docs)) return c.json({ error: "文档不存在" }, 404);
-    return c.body(docs[name], 200, { "Content-Type": "text/markdown; charset=utf-8" });
+    return c.body(docs[name], 200, {
+      "Content-Type": "text/markdown; charset=utf-8",
+    });
   }
   if (!file.endsWith(".md") || !(file in docs)) {
     return c.json({ error: "文档不存在" }, 404);

@@ -59,13 +59,13 @@
         "country": "country",
         "country_code": "country_code",
         "isp": "isp",
-        "lon": "longitude",
-        "lat": "latitude"
+        "lon": "lon",
+        "lat": "lat"
       }
     },
     {
       "name": "ip-api",
-      "url": "http://ip-api.com/json/{ip}?lang=zh-CN&fields=status,message,country,countryCode,regionName,city,isp,lat,lon",
+      "url": "http://ip-api.com/json/{ip}",
       "max_requests": 40,
       "time_window": 60,
       "enabled": true,

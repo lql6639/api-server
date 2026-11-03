@@ -110,7 +110,9 @@ function applyFieldTemplate(value, variables) {
   let out = String(value ?? "");
   if (!variables) return out;
   for (const [k, v] of Object.entries(variables)) {
-    out = out.split(`{${k}}`).join(v === undefined || v === null ? "" : String(v));
+    out = out
+      .split(`{${k}}`)
+      .join(v === undefined || v === null ? "" : String(v));
   }
   return out;
 }
@@ -126,7 +128,10 @@ function resolveFieldValue(data, apiField, variables) {
       .join("");
   }
   const directMatch = raw.match(/^\{([\w.-]+)\}$/);
-  if (directMatch && Object.prototype.hasOwnProperty.call(variables || {}, directMatch[1])) {
+  if (
+    directMatch &&
+    Object.prototype.hasOwnProperty.call(variables || {}, directMatch[1])
+  ) {
     return variables[directMatch[1]];
   }
   if (raw.includes("{") && raw.includes("}")) {
@@ -182,7 +187,10 @@ function sanitizeCached(cached, ip) {
   for (const field of responseFields) {
     if (["__proto__", "constructor", "prototype"].includes(field)) continue;
     const value = cached.data[field];
-    if (typeof value === "string" || (typeof value === "number" && Number.isFinite(value))) {
+    if (
+      typeof value === "string" ||
+      (typeof value === "number" && Number.isFinite(value))
+    ) {
       data[field] = value;
     }
   }
@@ -235,7 +243,9 @@ async function queryProviders(ip, ipVersion) {
   let tried = new Set();
 
   for (let round = 0; round <= retryCount; round++) {
-    let available = getAvailableApis(ipVersion).filter((a) => !tried.has(a.name));
+    let available = getAvailableApis(ipVersion).filter(
+      (a) => !tried.has(a.name),
+    );
     if (available.length === 0) {
       if (round < retryCount) {
         tried = new Set();
@@ -284,7 +294,17 @@ export const meta = {
   name: "IP 信息",
   description: "多上游容灾，自动重试",
   endpoints: [
-    { method: "GET", path: "/", description: "查询 当前/指定 IP", params: "?ip=x.x.x.x" },
-    { method: "GET", path: "/:ip", description: "查询指定 IP", params: "路径参数" },
+    {
+      method: "GET",
+      path: "/",
+      description: "查询 当前/指定 IP",
+      params: "?ip=x.x.x.x",
+    },
+    {
+      method: "GET",
+      path: "/:ip",
+      description: "查询指定 IP",
+      params: "路径参数",
+    },
   ],
 };
