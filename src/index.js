@@ -158,14 +158,10 @@ app.get("/v1/ipinfo/:ip", async (c) => respondIp(c, c.req.param("ip")));
 async function respondIp(c, ip) {
   try {
     const result = await ipinfo.queryIpInfoWithRetry(ip);
-    if (c.req.query("debug") === "1") {
-      return c.json({ ...result, diagnostics: ipinfo.getLastAttempts() });
-    }
     return c.json(result);
   } catch (error) {
     const body = { error: String(error?.message || error) };
     if (error?.source) body.source = error.source;
-    if (Array.isArray(error?.attempts)) body.diagnostics = error.attempts;
     return c.json(body, Number(error?.statusCode) || 500);
   }
 }

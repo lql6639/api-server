@@ -1,37 +1,16 @@
 {
-  "default_timeout": 3000,
+  "default_timeout": 1000,
   "retry_count": 3,
-  "cache_ttl": 86400,
-  "load_balance_strategy": "priority",
+  "cache_ttl": 604800,
+  "load_balance_strategy": "random",
   "ip_headers": [
-    {
-      "name": "X-Forwarded-For",
-      "priority": 1
-    },
-    {
-      "name": "x-real-ip",
-      "priority": 2
-    },
-    {
-      "name": "x-client-ip",
-      "priority": 3
-    },
-    {
-      "name": "cf-connecting-ip",
-      "priority": 4
-    },
-    {
-      "name": "x-forwarded",
-      "priority": 5
-    },
-    {
-      "name": "forwarded-for",
-      "priority": 6
-    },
-    {
-      "name": "forwarded",
-      "priority": 7
-    }
+    { "name": "X-Forwarded-For", "priority": 1 },
+    { "name": "x-real-ip", "priority": 2 },
+    { "name": "x-client-ip", "priority": 3 },
+    { "name": "cf-connecting-ip", "priority": 4 },
+    { "name": "x-forwarded", "priority": 5 },
+    { "name": "forwarded-for", "priority": 6 },
+    { "name": "forwarded", "priority": 7 }
   ],
   "response_fields": [
     "ip",
@@ -46,29 +25,11 @@
   ],
   "upstream_apis": [
     {
-      "name": "ip-api",
-      "url": "http://ip-api.com/json/{ip}?lang=zh-CN&fields=status,message,country,countryCode,regionName,city,isp,lat,lon",
-      "max_requests": 40,
-      "time_window": 60,
-      "enabled": true,
-      "ip_versions": "IPv6",
-      "field_mapping": {
-        "ip": "{ip}",
-        "prov": "regionName",
-        "city": "city",
-        "country": "country",
-        "country_code": "countryCode",
-        "isp": "isp",
-        "lon": "lon",
-        "lat": "lat"
-      }
-    },
-    {
       "name": "cdngod",
       "url": "https://ip.cdngod.com/v1/ip/{ip}",
       "max_requests": 120,
       "time_window": 60,
-      "enabled": false,
+      "enabled": true,
       "ip_versions": "IPv6,IPv4",
       "field_mapping": {
         "ip": "ip",
@@ -122,7 +83,7 @@
       "url": "https://api.songzixian.com/api/ip?dataSource=GLOBAL_IP&ip={ip}",
       "max_requests": 120,
       "time_window": 60,
-      "enabled": false,
+      "enabled": true,
       "ip_versions": "IPv6,IPv4",
       "field_mapping": {
         "ip": "data.ip",
