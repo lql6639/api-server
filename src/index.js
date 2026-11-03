@@ -169,7 +169,10 @@ app.get("/v1/ipinfo/:ip", async (c) => respondIp(c, c.req.param("ip")));
 
 async function respondIp(c, ip) {
   try {
-    const result = await ipinfo.queryIpInfoWithRetry(ip);
+    // ?nocache=1（或 ?refresh=1）跳过读缓存，用于调整上游后立即验证
+    const q = c.req.query();
+    const fresh = q.nocache === "1" || q.refresh === "1";
+    const result = await ipinfo.queryIpInfoWithRetry(ip, { fresh });
     return c.json(result);
   } catch (error) {
     const body = { error: String(error?.message || error) };

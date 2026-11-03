@@ -8,8 +8,6 @@ import {
   ipv6Prefix48,
 } from "../lib/ip.js";
 
-// 带版本前缀，改选源策略后让旧的「广州」缓存自然失效
-const CACHE_PREFIX = "ipinfo:p1:";
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 const IP_VERSION_VALUES = new Map([
   ["ipv4", 4],
@@ -18,6 +16,25 @@ const IP_VERSION_VALUES = new Map([
 
 const { upstream_apis: upstreamApis, response_fields: responseFields } =
   ipinfoConfig;
+
+// 缓存键带上「上游配置指纹」：只要改动 upstream_apis（增删源、改 URL、
+// 开关 enabled、调整顺序），指纹就变，旧缓存自动失效，改完部署即生效
+function upstreamFingerprint() {
+  const signature = (upstreamApis || [])
+    .map(
+      (api) =>
+        `${api.name}|${api.url}|${api.enabled ? 1 : 0}|${api.ip_versions ?? ""}`,
+    )
+    .join(";");
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < signature.length; i += 1) {
+    hash ^= signature.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+const CACHE_PREFIX = `ipinfo:${upstreamFingerprint()}:`;
 const cacheTtl = Number(ipinfoConfig.cache_ttl) || 0;
 const retryCount = Number(ipinfoConfig.retry_count) || 0;
 const queryTimeout = Number(ipinfoConfig.default_timeout) || 1000;
@@ -273,12 +290,15 @@ async function queryProviders(ip, ipVersion) {
   throw err;
 }
 
-export async function queryIpInfoWithRetry(ip) {
+export async function queryIpInfoWithRetry(ip, options = {}) {
   const { normalizedIp, ipVersion } = parseIp(ip);
   const cacheKey = CACHE_PREFIX + getCacheKey(normalizedIp);
 
-  const cached = sanitizeCached(await cacheGet(cacheKey), normalizedIp);
-  if (cached) return cached;
+  // ?nocache=1 时跳过读缓存（仍写缓存），维护上游时用来立刻验证效果
+  if (!options.fresh) {
+    const cached = sanitizeCached(await cacheGet(cacheKey), normalizedIp);
+    if (cached) return cached;
+  }
 
   return dedupe(cacheKey, async () => {
     const again = sanitizeCached(await cacheGet(cacheKey), normalizedIp);

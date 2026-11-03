@@ -64,6 +64,24 @@
       }
     },
     {
+      "name": "ip-api",
+      "url": "http://ip-api.com/json/{ip}?lang=zh-CN&fields=status,message,country,countryCode,regionName,city,isp,lat,lon",
+      "max_requests": 40,
+      "time_window": 60,
+      "enabled": true,
+      "ip_versions": "IPv6",
+      "field_mapping": {
+        "ip": "{ip}",
+        "prov": "regionName",
+        "city": "city",
+        "country": "country",
+        "country_code": "countryCode",
+        "isp": "isp",
+        "lon": "lon",
+        "lat": "lat"
+      }
+    },
+    {
       "name": "ip9",
       "url": "https://ip9.com.cn/get?ip={ip}",
       "max_requests": 50,
