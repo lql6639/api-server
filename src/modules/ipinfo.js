@@ -8,7 +8,8 @@ import {
   ipv6Prefix48,
 } from "../lib/ip.js";
 
-const CACHE_PREFIX = "ipinfo:";
+// v4：切换 priority 策略后旧缓存（ip9 只到省级）需失效
+const CACHE_PREFIX = "ipinfo:v5:";
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 const IP_VERSION_VALUES = new Map([
   ["ipv4", 4],
@@ -24,6 +25,11 @@ const queryTimeout = Number(ipinfoConfig.default_timeout) || 1000;
 const apiIpVersions = new Map();
 const apiRequestCounters = new Map();
 let lastUsedApiIndex = -1;
+// 仅用于 ?debug=1 的排障输出，不参与业务
+let lastAttempts = [];
+export function getLastAttempts() {
+  return lastAttempts;
+}
 
 upstreamApis.forEach((api) => {
   apiIpVersions.set(api.name, parseIpVersions(api));
@@ -70,6 +76,10 @@ function selectNextApi(available) {
   if (!available || available.length === 0) return null;
   if (available.length === 1) return available[0];
   const strategy = ipinfoConfig.load_balance_strategy || "round_robin";
+  // priority：严格按配置顺序，保证精度最高的上游优先（IPv6 下 ip9 只到省级，必须有优先级）
+  if (strategy === "priority") {
+    return available[0];
+  }
   if (strategy === "random") {
     return available[Math.floor(Math.random() * available.length)];
   }
@@ -227,6 +237,8 @@ async function queryProvider(ip, api) {
 async function queryProviders(ip, ipVersion) {
   let lastError = null;
   let tried = new Set();
+  const attempts = [];
+  lastAttempts = attempts;
 
   for (let round = 0; round <= retryCount; round++) {
     let available = getAvailableApis(ipVersion).filter((a) => !tried.has(a.name));
@@ -241,19 +253,25 @@ async function queryProviders(ip, ipVersion) {
     }
     const api = selectNextApi(available);
     if (!api) break;
+    const started = Date.now();
     try {
       const result = await queryProvider(ip, api);
       return result;
     } catch (error) {
       lastError = error;
+      attempts.push({ name: api.name, ms: Date.now() - started, error: error.message });
       tried.add(api.name);
     }
   }
 
-  if (lastError) throw lastError;
+  if (lastError) {
+    lastError.attempts = attempts;
+    throw lastError;
+  }
   const err = new Error(`没有支持 IPv${ipVersion} 的可用API`);
   err.source = "系统";
   err.statusCode = 503;
+  err.attempts = attempts;
   throw err;
 }
 
