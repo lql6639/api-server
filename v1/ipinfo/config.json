@@ -2,7 +2,6 @@
   "default_timeout": 3000,
   "retry_count": 3,
   "cache_ttl": 86400,
-  "load_balance_strategy": "priority",
   "ip_headers": [
     {
       "name": "X-Forwarded-For",
@@ -46,24 +45,6 @@
   ],
   "upstream_apis": [
     {
-      "name": "cdngod",
-      "url": "https://ip.cdngod.com/v1/ip/{ip}",
-      "max_requests": 120,
-      "time_window": 60,
-      "enabled": false,
-      "ip_versions": "IPv6,IPv4",
-      "field_mapping": {
-        "ip": "ip",
-        "prov": "province",
-        "city": "city",
-        "country": "country",
-        "country_code": "country_code",
-        "isp": "isp",
-        "lon": "lon",
-        "lat": "lat"
-      }
-    },
-    {
       "name": "ip-api",
       "url": "http://ip-api.com/json/{ip}?lang=zh-CN&fields=status,message,country,countryCode,regionName,city,isp,lat,lon",
       "max_requests": 40,
@@ -97,24 +78,6 @@
         "isp": "data.isp",
         "lon": "data.lng",
         "lat": "data.lat"
-      }
-    },
-    {
-      "name": "bt.cn",
-      "url": "https://www.bt.cn/api/panel/get_ip_info?ip={ip}",
-      "max_requests": 50,
-      "time_window": 60,
-      "enabled": false,
-      "ip_versions": "IPv4",
-      "field_mapping": {
-        "ip": "{ip}",
-        "prov": "{ip}.province",
-        "city": "{ip}.city",
-        "country": "{ip}.country",
-        "country_code": "en_short_code",
-        "isp": "{ip}.carrier",
-        "lon": "{ip}.longitude",
-        "lat": "{ip}.latitude"
       }
     }
   ]

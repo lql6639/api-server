@@ -41,7 +41,6 @@ const queryTimeout = Number(ipinfoConfig.default_timeout) || 1000;
 
 const apiIpVersions = new Map();
 const apiRequestCounters = new Map();
-let lastUsedApiIndex = -1;
 
 upstreamApis.forEach((api) => {
   apiIpVersions.set(api.name, parseIpVersions(api));
@@ -84,27 +83,10 @@ function getAvailableApis(ipVersion) {
   );
 }
 
+// 只有「按配置顺序」一种策略：永远取最靠前、且本次尚未失败过的源
 function selectNextApi(available) {
   if (!available || available.length === 0) return null;
-  if (available.length === 1) return available[0];
-  const strategy = ipinfoConfig.load_balance_strategy || "round_robin";
-  // priority：严格按 config.json 里 upstream_apis 的书写顺序选源，
-  // 前一个失败（超时/报错）才顺延到下一个，便于手工调整优先级
-  if (strategy === "priority") {
-    return available[0];
-  }
-  if (strategy === "random") {
-    return available[Math.floor(Math.random() * available.length)];
-  }
-  if (strategy === "least_used") {
-    return available.reduce((least, current) => {
-      const leastCount = apiRequestCounters.get(least.name)?.count ?? 0;
-      const currentCount = apiRequestCounters.get(current.name)?.count ?? 0;
-      return currentCount < leastCount ? current : least;
-    });
-  }
-  lastUsedApiIndex = (lastUsedApiIndex + 1) % available.length;
-  return available[lastUsedApiIndex];
+  return available[0];
 }
 
 function getNestedValue(obj, path) {
