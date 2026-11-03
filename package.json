@@ -1,13 +1,10 @@
 {
   "name": "api-server",
-  "version": "7.0.0",
+  "private": true,
+  "version": "6.0.0",
   "author": "koizora",
   "AuthorGithub": "https://github.com/lql6639",
-  "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=22"
-  },
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
