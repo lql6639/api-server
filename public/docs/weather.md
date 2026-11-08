@@ -20,9 +20,9 @@
 ## 调用示例
 
 ```bash
-curl 'https://api.lovlin.eu.cc/v1/weather'
-curl 'https://api.lovlin.eu.cc/v1/weather?city=北京'
-curl 'https://api.lovlin.eu.cc/v1/weather/realtime?city=上海'
+curl 'https://server.lovlin.cn/v1/weather'
+curl 'https://server.lovlin.cn/v1/weather?city=北京'
+curl 'https://server.lovlin.cn/v1/weather/realtime?city=上海'
 ```
 
 ## 响应

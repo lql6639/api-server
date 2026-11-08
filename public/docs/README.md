@@ -12,7 +12,7 @@
 
 ## 通用约定
 
-**基础 URL**：`https://api.lovlin.eu.cc`
+**基础 URL**：`https://server.lovlin.cn`
 
 **响应格式**：JSON
 
@@ -22,13 +22,13 @@
 
 ```bash
 # 随机一张图片（302 跳转）
-curl -L https://api.lovlin.eu.cc/v1/img
+curl -L https://server.lovlin.cn/v1/img
 
 # 查询当前 IP 信息
-curl https://api.lovlin.eu.cc/v1/ipinfo
+curl https://server.lovlin.cn/v1/ipinfo
 
 # 北京天气
-curl 'https://api.lovlin.eu.cc/v1/weather?city=北京'
+curl 'https://server.lovlin.cn/v1/weather?city=北京'
 ```
 
 ## 详细文档

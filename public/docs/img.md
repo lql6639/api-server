@@ -20,15 +20,15 @@
 ## 302 重定向
 
 ```bash
-curl -L https://api.lovlin.eu.cc/v1/img
+curl -L https://server.lovlin.cn/v1/img
 ```
 
-响应：`302 Found` → `Location: https://api.lovlin.eu.cc/image/background/xxx.png`
+响应：`302 Found` → `Location: https://server.lovlin.cn/image/background/xxx.png`
 
 ## JSON
 
 ```bash
-curl https://api.lovlin.eu.cc/v1/img?type=json
+curl https://server.lovlin.cn/v1/img?type=json
 ```
 
 ```json
@@ -38,9 +38,9 @@ curl https://api.lovlin.eu.cc/v1/img?type=json
   "data": {
     "id": "1",
     "name": "100066591_p0.png",
-    "url": "https://api.lovlin.eu.cc/image",
+    "url": "https://server.lovlin.cn/image",
     "path": "/background/100066591_p0.png",
-    "fullUrl": "https://api.lovlin.eu.cc/image/background/100066591_p0.png"
+    "fullUrl": "https://server.lovlin.cn/image/background/100066591_p0.png"
   }
 }
 ```
@@ -56,17 +56,17 @@ curl https://api.lovlin.eu.cc/v1/img?type=json
 ## 纯文本
 
 ```bash
-curl https://api.lovlin.eu.cc/v1/img?type=text
+curl https://server.lovlin.cn/v1/img?type=text
 ```
 
 ```js
-https://api.lovlin.eu.cc/image/background/100066591_p0.png
+https://server.lovlin.cn/image/background/100066591_p0.png
 ```
 
 ## 图片流
 
 ```bash
-curl https://api.lovlin.eu.cc/v1/img?type=img -o img.png
+curl https://server.lovlin.cn/v1/img?type=img -o img.png
 ```
 
 ---
@@ -74,7 +74,7 @@ curl https://api.lovlin.eu.cc/v1/img?type=img -o img.png
 ## 图片列表
 
 ```bash
-curl https://api.lovlin.eu.cc/v1/img/list?type=json
+curl https://server.lovlin.cn/v1/img/list?type=json
 ```
 
 ```json
@@ -86,7 +86,7 @@ curl https://api.lovlin.eu.cc/v1/img/list?type=json
     {
       "id": "1",
       "name": "100066591_p0.png",
-      "url": "https://api.lovlin.eu.cc/image",
+      "url": "https://server.lovlin.cn/image",
       "path": "/background/100066591_p0.png"
     }
   ]
@@ -94,12 +94,12 @@ curl https://api.lovlin.eu.cc/v1/img/list?type=json
 ```
 
 ```bash
-curl https://api.lovlin.eu.cc/v1/img/list?type=text
+curl https://server.lovlin.cn/v1/img/list?type=text
 ```
 
 ```js
-https://api.lovlin.eu.cc/image/background/100066591_p0.png
-https://api.lovlin.eu.cc/image/background/100257227_p0.png
+https://server.lovlin.cn/image/background/100066591_p0.png
+https://server.lovlin.cn/image/background/100257227_p0.png
 ```
 
 ---

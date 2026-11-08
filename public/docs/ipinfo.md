@@ -11,8 +11,8 @@
 ## 调用示例
 
 ```bash
-curl https://api.lovlin.eu.cc/v1/ipinfo
-curl https://api.lovlin.eu.cc/v1/ipinfo?ip=114.114.114.114
+curl https://server.lovlin.cn/v1/ipinfo
+curl https://server.lovlin.cn/v1/ipinfo?ip=114.114.114.114
 ```
 
 ## 响应

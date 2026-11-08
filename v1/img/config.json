@@ -1,6 +1,6 @@
 {
   "mode": "direct",
-  "url": "https://api.lovlin.eu.cc/image",
+  "url": "https://server.lovlin.cn/image",
   "cache_ttl": 86400,
   "upstream": {
     "horizontal": [

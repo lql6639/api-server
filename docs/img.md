@@ -28,7 +28,7 @@
 - **行为**：
   - 返回 `302 Found`
   - 响应头 `Location` 为随机图片的完整 URL，例如：
-    - `https://api.lovlin.eu.cc/image/background/100066591_p0.png`
+    - `https://server.lovlin.cn/image/background/100066591_p0.png`
 
 #### 1.2 纯文本 URL
 
@@ -39,7 +39,7 @@
   - 响应体为一行文本，即随机图片完整 URL：
 
 ```text
-https://api.lovlin.eu.cc/image/background/100066591_p0.png
+https://server.lovlin.cn/image/background/100066591_p0.png
 ```
 
 #### 1.3 JSON 格式
@@ -55,9 +55,9 @@ https://api.lovlin.eu.cc/image/background/100066591_p0.png
   "data": {
     "id": "1",
     "name": "100066591_p0.png",
-    "url": "https://api.lovlin.eu.cc/image",
+    "url": "https://server.lovlin.cn/image",
     "path": "/background/100066591_p0.png",
-    "fullUrl": "https://api.lovlin.eu.cc/image/background/100066591_p0.png"
+    "fullUrl": "https://server.lovlin.cn/image/background/100066591_p0.png"
   }
 }
 ```
@@ -108,19 +108,19 @@ https://api.lovlin.eu.cc/image/background/100066591_p0.png
     {
       "id": "1",
       "name": "100066591_p0.png",
-      "url": "https://api.lovlin.eu.cc/image",
+      "url": "https://server.lovlin.cn/image",
       "path": "/background/100066591_p0.png"
     },
     {
       "id": "2",
       "name": "100257227_p0.png",
-      "url": "https://api.lovlin.eu.cc/image",
+      "url": "https://server.lovlin.cn/image",
       "path": "/background/100257227_p0.png"
     },
     {
       "id": "3",
       "name": "100339220_p0.jpg",
-      "url": "https://api.lovlin.eu.cc/image",
+      "url": "https://server.lovlin.cn/image",
       "path": "/background/100339220_p0.jpg"
     }
   ]
@@ -141,9 +141,9 @@ https://api.lovlin.eu.cc/image/background/100066591_p0.png
   - 每行一个完整 URL，形如：
 
 ```text
-https://api.lovlin.eu.cc/image/background/100066591_p0.png
-https://api.lovlin.eu.cc/image/background/100257227_p0.png
-https://api.lovlin.eu.cc/image/background/100339220_p0.jpg
+https://server.lovlin.cn/image/background/100066591_p0.png
+https://server.lovlin.cn/image/background/100257227_p0.png
+https://server.lovlin.cn/image/background/100339220_p0.jpg
 ```
 
 ## 缓存与并发行为
@@ -166,11 +166,11 @@ https://api.lovlin.eu.cc/image/background/100339220_p0.jpg
 
 ```json
 {
-  "url": "https://api.lovlin.eu.cc/image",
+  "url": "https://server.lovlin.cn/image",
   "cache_ttl": 3600,
   "upstream": {
-    "horizontal": "https://api.lovlin.eu.cc/api/images/list?path=/background",
-    "vertical": "https://api.lovlin.eu.cc/api/images/list?path=/background-phone"
+    "horizontal": "https://server.lovlin.cn/api/images/list?path=/background",
+    "vertical": "https://server.lovlin.cn/api/images/list?path=/background-phone"
   },
   "timeout_ms": 10000
 }
