@@ -31,5 +31,6 @@
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
   "vars": {
     "LOG_LEVEL": "info",
+    "AMAP_API_KEY": "2863ccd3a9e0df85433cf960ed3eaade"
   },
 }
