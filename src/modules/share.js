@@ -11,7 +11,8 @@ const SCHEMA = `
     device TEXT,
     text TEXT NOT NULL,
     images TEXT,
-    location TEXT
+    location TEXT,
+    status INTEGER NOT NULL DEFAULT 0
   )
 `;
 
@@ -57,17 +58,40 @@ function rowToDto(row) {
     text: row.text || "",
     images: images ?? 0,
     location: row.location || "",
+    status: row.status ?? 0,
   };
 }
 
-// 入参 → 落库字段
+// 入参 → 落库字段（含校验）
+// 返回 { data } 或 { error }，调用处根据有无 error 判断是否通过
 function normalizeInput(body) {
   const date = String(body?.date || "").trim();
   const text = String(body?.text || "").trim();
   const device = String(body?.device || "").trim();
   const location = String(body?.location || "").trim();
   const images = body?.images ?? 0;
-  return { date, text, device, location, images };
+
+  // 校验 date 格式：YYYY-MM-DD HH:mm
+  if (!date) return { error: "date 不能为空" };
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(date)) {
+    return { error: "date 格式应为 YYYY-MM-DD HH:mm" };
+  }
+
+  // 校验 text：非空 + 长度上限
+  if (!text) return { error: "text 不能为空" };
+  if (text.length > 500) {
+    return { error: `text 最多 500 个字，当前 ${text.length} 个` };
+  }
+
+  // 校验 images：数字 0~3
+  const imagesNum = Number(images);
+  if (!Number.isInteger(imagesNum) || imagesNum < 0 || imagesNum > 3) {
+    return { error: "images 必须是 0~3 的整数" };
+  }
+
+  return {
+    data: { date, text, device, location, images: imagesNum },
+  };
 }
 
 export async function handleList(c) {
@@ -83,7 +107,9 @@ export async function handleList(c) {
     const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? offsetRaw : 0;
 
     const { results } = await db
-      .prepare(`SELECT * FROM ${TABLE} ORDER BY date DESC LIMIT ? OFFSET ?`)
+      .prepare(
+        `SELECT * FROM ${TABLE} WHERE status = 0 ORDER BY date DESC LIMIT ? OFFSET ?`,
+      )
       .bind(limit, offset)
       .all();
 
@@ -105,7 +131,7 @@ export async function handleGet(c) {
       return c.json({ success: false, message: "无效的 id" }, 400);
 
     const row = await db
-      .prepare(`SELECT * FROM ${TABLE} WHERE id = ?`)
+      .prepare(`SELECT * FROM ${TABLE} WHERE id = ? AND status = 0`)
       .bind(id)
       .first();
     if (!row) return c.json({ success: false, message: "分享不存在" }, 404);
@@ -123,12 +149,11 @@ export async function handleCreate(c) {
 
   try {
     await ensureSchema(db);
-    const { date, text, device, location, images } = normalizeInput(
-      await c.req.json(),
-    );
-    if (!date || !text) {
-      return c.json({ success: false, message: "date 和 text 必填" }, 400);
+    const parsed = normalizeInput(await c.req.json());
+    if (parsed.error) {
+      return c.json({ success: false, message: parsed.error }, 400);
     }
+    const { date, text, device, location, images } = parsed.data;
 
     const imagesJson =
       typeof images === "string" ? images : JSON.stringify(images ?? 0);
@@ -160,15 +185,18 @@ export async function handleUpdate(c) {
     if (!Number.isFinite(id))
       return c.json({ success: false, message: "无效的 id" }, 400);
 
-    const { date, text, device, location, images } = normalizeInput(
-      await c.req.json(),
-    );
+    const parsed = normalizeInput(await c.req.json());
+    if (parsed.error) {
+      return c.json({ success: false, message: parsed.error }, 400);
+    }
+    const { date, text, device, location, images } = parsed.data;
+
     const imagesJson =
       typeof images === "string" ? images : JSON.stringify(images ?? 0);
 
     const result = await db
       .prepare(
-        `UPDATE ${TABLE} SET date = ?, device = ?, text = ?, images = ?, location = ? WHERE id = ?`,
+        `UPDATE ${TABLE} SET date = ?, device = ?, text = ?, images = ?, location = ? WHERE id = ? AND status = 0`,
       )
       .bind(date, device, text, imagesJson, location, id)
       .run();
@@ -193,8 +221,9 @@ export async function handleDelete(c) {
     if (!Number.isFinite(id))
       return c.json({ success: false, message: "无效的 id" }, 400);
 
+    // 软删除：标记 status=1，不物理删除数据
     const result = await db
-      .prepare(`DELETE FROM ${TABLE} WHERE id = ?`)
+      .prepare(`UPDATE ${TABLE} SET status = 1 WHERE id = ? AND status = 0`)
       .bind(id)
       .run();
     if (!result.meta?.changes)
