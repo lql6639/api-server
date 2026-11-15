@@ -7,9 +7,11 @@ import docReadme from "../public/docs/README.md";
 import docImg from "../public/docs/img.md";
 import docIpinfo from "../public/docs/ipinfo.md";
 import docWeather from "../public/docs/weather.md";
+import docShare from "../public/docs/share.md";
 import * as img from "./modules/img.js";
 import * as ipinfo from "./modules/ipinfo.js";
 import * as weather from "./modules/weather.js";
+import * as share from "./modules/share.js";
 import { getClientIp } from "./lib/ip.js";
 
 const PROJECT_NAME = "API Server";
@@ -18,9 +20,10 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 100;
 
 const modules = [
-  { id: "img", ...img.meta },
-  { id: "ipinfo", ...ipinfo.meta },
   { id: "weather", ...weather.meta },
+  { id: "ipinfo", ...ipinfo.meta },
+  { id: "img", ...img.meta },
+  { id: "share", ...share.meta },
 ];
 
 const docs = {
@@ -28,6 +31,7 @@ const docs = {
   "img.md": docImg,
   "ipinfo.md": docIpinfo,
   "weather.md": docWeather,
+  "share.md": docShare,
 };
 
 // 与旧版 utils/markdownRenderer.js 一致的消毒逻辑
@@ -186,6 +190,13 @@ app.get("/v1/weather", (c) => weather.handler(c, ""));
 app.get("/v1/weather/", (c) => weather.handler(c, ""));
 app.get("/v1/weather/realtime", (c) => weather.handler(c, "realtime"));
 app.get("/v1/weather/week", (c) => weather.handler(c, "week"));
+
+// 分享（说说）
+app.get("/v1/share", (c) => share.handleList(c));
+app.get("/v1/share/:id", (c) => share.handleGet(c));
+app.post("/v1/share", (c) => share.handleCreate(c));
+app.put("/v1/share/:id", (c) => share.handleUpdate(c));
+app.delete("/v1/share/:id", (c) => share.handleDelete(c));
 
 app.all("/v1/*", (c) => c.json({ error: "接口不存在" }, 404));
 

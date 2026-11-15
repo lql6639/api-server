@@ -22,7 +22,10 @@
 ```bash
 curl 'https://server.lovlin.cn/v1/weather'
 curl 'https://server.lovlin.cn/v1/weather?city=北京'
+curl 'https://server.lovlin.cn/v1/weather/realtime'
 curl 'https://server.lovlin.cn/v1/weather/realtime?city=上海'
+curl 'https://server.lovlin.cn/v1/weather/week'
+curl 'https://server.lovlin.cn/v1/weather/week?city=杭州'
 ```
 
 ## 响应

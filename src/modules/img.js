@@ -6,7 +6,9 @@ const CACHE_PREFIX = "img:";
 const DEFAULT_MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
 function normalizeBaseUrl(value) {
-  return String(value ?? "").trim().replace(/\/+$/g, "");
+  return String(value ?? "")
+    .trim()
+    .replace(/\/+$/g, "");
 }
 
 function normalizePath(value) {
@@ -16,7 +18,9 @@ function normalizePath(value) {
 }
 
 function normalizeOrientation(value) {
-  const s = String(value ?? "").trim().toLowerCase();
+  const s = String(value ?? "")
+    .trim()
+    .toLowerCase();
   return s === "v" || s === "vertical" ? "vertical" : "horizontal";
 }
 
@@ -27,13 +31,22 @@ function isVerticalByUserAgent(ua) {
 
 function pickOrientation(c, mode) {
   if (mode !== "ua") return normalizeOrientation(mode);
-  return isVerticalByUserAgent(c.req.header("user-agent")) ? "vertical" : "horizontal";
+  return isVerticalByUserAgent(c.req.header("user-agent"))
+    ? "vertical"
+    : "horizontal";
 }
 
 function extractList(data) {
   const preferred = [
-    ["items"], ["list"], ["images"], ["result"], ["data"],
-    ["data", "items"], ["data", "list"], ["data", "images"], ["data", "result"],
+    ["items"],
+    ["list"],
+    ["images"],
+    ["result"],
+    ["data"],
+    ["data", "items"],
+    ["data", "list"],
+    ["data", "images"],
+    ["data", "result"],
   ];
   const getByPath = (obj, keys) => {
     let cur = obj;
@@ -81,7 +94,8 @@ function normalizeCached(value) {
   };
 }
 
-const ttlSeconds = Number(imgConfig.cache_ttl) > 0 ? Number(imgConfig.cache_ttl) : 0;
+const ttlSeconds =
+  Number(imgConfig.cache_ttl) > 0 ? Number(imgConfig.cache_ttl) : 0;
 
 function isFresh(data) {
   if (ttlSeconds <= 0) return false;
@@ -94,10 +108,12 @@ async function refresh(orientation) {
 
   return dedupe(key, async () => {
     const baseUrl = normalizeBaseUrl(imgConfig.url);
-    if (!baseUrl) throw Object.assign(new Error("配置缺少url"), { statusCode: 500 });
+    if (!baseUrl)
+      throw Object.assign(new Error("配置缺少url"), { statusCode: 500 });
 
     const upstreamUrl = String(imgConfig?.upstream?.[o] || "").trim();
-    if (!upstreamUrl) throw Object.assign(new Error("配置缺少upstream"), { statusCode: 500 });
+    if (!upstreamUrl)
+      throw Object.assign(new Error("配置缺少upstream"), { statusCode: 500 });
 
     const raw = await fetchJson(upstreamUrl, {
       timeout: Number(imgConfig.timeout_ms) || 10000,
@@ -132,7 +148,10 @@ async function getList(orientation) {
 }
 
 function errorJson(message, status = 502) {
-  return Response.json({ status: "error", time: Date.now(), message }, { status });
+  return Response.json(
+    { status: "error", time: Date.now(), message },
+    { status },
+  );
 }
 
 function noStore(response) {
@@ -183,7 +202,8 @@ async function proxyImage(imageUrl) {
     "Content-Type": contentType,
     "X-Content-Type-Options": "nosniff",
   });
-  if (Number.isFinite(len) && len >= 0) headers.set("Content-Length", String(len));
+  if (Number.isFinite(len) && len >= 0)
+    headers.set("Content-Length", String(len));
   const etag = upstream.headers.get("etag");
   if (etag) headers.set("ETag", etag);
 
@@ -191,7 +211,11 @@ async function proxyImage(imageUrl) {
 }
 
 function isDirectMode() {
-  return String(imgConfig.mode ?? "").trim().toLowerCase() === "direct";
+  return (
+    String(imgConfig.mode ?? "")
+      .trim()
+      .toLowerCase() === "direct"
+  );
 }
 
 function buildDirectList(orientation) {
@@ -235,14 +259,18 @@ async function loadListOrStale(orientation) {
 }
 
 export async function handleRandom(c, mode) {
-  const type = String(c.req.query("type") || "302").trim().toLowerCase();
+  const type = String(c.req.query("type") || "302")
+    .trim()
+    .toLowerCase();
   const orientation = pickOrientation(c, mode);
 
   let list;
   try {
     list = await loadListOrStale(orientation);
   } catch (e) {
-    return noStore(errorJson(String(e?.message || e), Number(e?.statusCode) || 502));
+    return noStore(
+      errorJson(String(e?.message || e), Number(e?.statusCode) || 502),
+    );
   }
 
   if (!list || list.urls.length === 0) {
@@ -250,9 +278,7 @@ export async function handleRandom(c, mode) {
   }
 
   // 直出模式按主备顺序取第一个（失败再切下一个）；列表模式随机取
-  const idx = isDirectMode()
-    ? 0
-    : Math.floor(Math.random() * list.urls.length);
+  const idx = isDirectMode() ? 0 : Math.floor(Math.random() * list.urls.length);
   const fullUrl = list.urls[idx];
   const it = list.items[idx] || { name: "", path: "" };
   const data = {
@@ -276,7 +302,9 @@ export async function handleRandom(c, mode) {
   }
 
   if (type === "json") {
-    return noStore(Response.json({ status: "success", time: Date.now(), data }));
+    return noStore(
+      Response.json({ status: "success", time: Date.now(), data }),
+    );
   }
 
   if (type === "img") {
@@ -296,7 +324,9 @@ export async function handleRandom(c, mode) {
 }
 
 export async function handleList(c, mode) {
-  const type = String(c.req.query("type") || "json").trim().toLowerCase();
+  const type = String(c.req.query("type") || "json")
+    .trim()
+    .toLowerCase();
   const orientation = pickOrientation(c, mode);
 
   if (isDirectMode()) {
@@ -312,7 +342,9 @@ export async function handleList(c, mode) {
   try {
     list = await loadListOrStale(orientation);
   } catch (e) {
-    return noStore(errorJson(String(e?.message || e), Number(e?.statusCode) || 502));
+    return noStore(
+      errorJson(String(e?.message || e), Number(e?.statusCode) || 502),
+    );
   }
 
   if (!list || list.urls.length === 0) {
@@ -334,7 +366,12 @@ export async function handleList(c, mode) {
       path: it.path,
     }));
     return noStore(
-      Response.json({ status: "success", total: data.length, time: Date.now(), data }),
+      Response.json({
+        status: "success",
+        total: data.length,
+        time: Date.now(),
+        data,
+      }),
     );
   }
   return noStore(errorJson("type仅支持text/json", 400));
@@ -344,11 +381,41 @@ export const meta = {
   name: "随机图片",
   description: "上游聚合，UA 自适应",
   endpoints: [
-    { method: "GET", path: "/", description: "UA 自适应", params: "type=302|json|text|img" },
-    { method: "GET", path: "/h", description: "横屏", params: "type=302|json|text|img" },
-    { method: "GET", path: "/v", description: "竖屏", params: "type=302|json|text|img" },
-    { method: "GET", path: "/list", description: "图片列表", params: "type=json|text" },
-    { method: "GET", path: "/list/h", description: "横屏列表", params: "type=json|text" },
-    { method: "GET", path: "/list/v", description: "竖屏列表", params: "type=json|text" },
+    {
+      method: "GET",
+      path: "/",
+      description: "UA 自适应",
+      params: "type=302|json|text|img",
+    },
+    {
+      method: "GET",
+      path: "/h",
+      description: "横屏",
+      params: "type=302|json|text|img",
+    },
+    {
+      method: "GET",
+      path: "/v",
+      description: "竖屏",
+      params: "type=302|json|text|img",
+    },
+    {
+      method: "GET",
+      path: "/list",
+      description: "图片列表",
+      params: "type=json|text",
+    },
+    {
+      method: "GET",
+      path: "/list/h",
+      description: "横屏列表",
+      params: "type=json|text",
+    },
+    {
+      method: "GET",
+      path: "/list/v",
+      description: "竖屏列表",
+      params: "type=json|text",
+    },
   ],
 };
