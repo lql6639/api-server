@@ -37,6 +37,11 @@
       "binding": "SHARE_DB",
       "database_name": "share",
       "database_id": "966e4373-44da-4c7c-8f6a-07695584f426"
+    },
+    {
+      "binding": "WISHES_DB",
+      "database_name": "wishes",
+      "database_id": "49551e3d-849b-4b6c-838a-74f08dff0d30"
     }
   ],
 }

@@ -8,6 +8,7 @@
 | IP 查询  | `/v1/ipinfo`  | IP 地理位置及 ISP 信息           |
 | 随机图片 | `/v1/img`     | 横/竖屏自适应，302/json/text/img |
 | 分享     | `/v1/share`   | 日常分享（说说），D1 存储，读公开写需 token |
+| 心愿     | `/v1/wishes`  | 心情树洞（心愿/树洞），D1 存储，发布公开改删需 token |
 
 查看所有端点：`GET /v1/meta`
 
@@ -30,6 +31,9 @@ curl https://server.lovlin.cn/v1/ipinfo
 
 # 随机一张图片（302 跳转）
 curl -L https://server.lovlin.cn/v1/img
+
+# 心情树洞
+curl 'https://server.lovlin.cn/v1/wishes'
 ```
 
 ## 详细文档
@@ -38,3 +42,4 @@ curl -L https://server.lovlin.cn/v1/img
 - [IP 查询](ipinfo.md)
 - [随机图片](img.md)
 - [分享](share.md)
+- [心愿](wishes.md)
