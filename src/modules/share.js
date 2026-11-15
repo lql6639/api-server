@@ -11,8 +11,7 @@ const SCHEMA = `
     device TEXT,
     text TEXT NOT NULL,
     images TEXT,
-    location TEXT,
-    created_at INTEGER
+    location TEXT
   )
 `;
 
@@ -58,7 +57,6 @@ function rowToDto(row) {
     text: row.text || "",
     images: images ?? 0,
     location: row.location || "",
-    createdAt: row.created_at || null,
   };
 }
 
@@ -134,12 +132,11 @@ export async function handleCreate(c) {
 
     const imagesJson =
       typeof images === "string" ? images : JSON.stringify(images ?? 0);
-    const now = Date.now();
     const result = await db
       .prepare(
-        `INSERT INTO ${TABLE} (date, device, text, images, location, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${TABLE} (date, device, text, images, location) VALUES (?, ?, ?, ?, ?)`,
       )
-      .bind(date, device, text, imagesJson, location, now)
+      .bind(date, device, text, imagesJson, location)
       .run();
 
     return c.json({
