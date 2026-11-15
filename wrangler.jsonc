@@ -42,6 +42,11 @@
       "binding": "WISHES_DB",
       "database_name": "wishes",
       "database_id": "49551e3d-849b-4b6c-838a-74f08dff0d30"
+    },
+    {
+      "binding": "TWIKOO_DB",
+      "database_name": "twikoo",
+      "database_id": "907867cc-8c6a-406e-9c0a-4c17341a6fac"
     }
   ],
 }

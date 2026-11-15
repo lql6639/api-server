@@ -215,14 +215,14 @@ export const meta = {
   endpoints: [
     {
       method: "GET",
-      path: "/",
+      path: "",
       description: "心愿列表",
       params: "?limit=200&offset=0&type=wish|treehole",
     },
     { method: "GET", path: "/:id", description: "单条心愿", params: ":id" },
     {
       method: "POST",
-      path: "/",
+      path: "",
       description: "发布心愿（公开）",
       params: "content/nickname/color/type/date",
     },

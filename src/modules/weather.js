@@ -540,7 +540,7 @@ export const meta = {
   endpoints: [
     {
       method: "GET",
-      path: "/",
+      path: "",
       description: "实时 + 7 天",
       params: "?city=深圳",
     },

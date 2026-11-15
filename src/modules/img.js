@@ -379,12 +379,12 @@ export async function handleList(c, mode) {
 
 export const meta = {
   name: "随机图片",
-  description: "上游聚合，UA 自适应",
+  description: "上游聚合，自适应",
   endpoints: [
     {
       method: "GET",
-      path: "/",
-      description: "UA 自适应",
+      path: "",
+      description: "自适应",
       params: "type=302|json|text|img",
     },
     {

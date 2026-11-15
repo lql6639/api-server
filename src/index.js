@@ -9,11 +9,13 @@ import docIpinfo from "../public/docs/ipinfo.md";
 import docWeather from "../public/docs/weather.md";
 import docShare from "../public/docs/share.md";
 import docWishes from "../public/docs/wishes.md";
+import docComment from "../public/docs/comment.md";
 import * as img from "./modules/img.js";
 import * as ipinfo from "./modules/ipinfo.js";
 import * as weather from "./modules/weather.js";
 import * as share from "./modules/share.js";
 import * as wishes from "./modules/wishes.js";
+import * as comment from "./modules/comment.js";
 import { getClientIp } from "./lib/ip.js";
 
 const PROJECT_NAME = "API Server";
@@ -27,6 +29,7 @@ const modules = [
   { id: "img", ...img.meta },
   { id: "share", ...share.meta },
   { id: "wishes", ...wishes.meta },
+  { id: "comment", ...comment.meta },
 ];
 
 const docs = {
@@ -36,6 +39,7 @@ const docs = {
   "img.md": docImg,
   "share.md": docShare,
   "wishes.md": docWishes,
+  "comment.md": docComment,
 };
 
 // 与旧版 utils/markdownRenderer.js 一致的消毒逻辑
@@ -208,6 +212,12 @@ app.get("/v1/wishes/:id", (c) => wishes.handleGet(c));
 app.post("/v1/wishes", (c) => wishes.handleCreate(c));
 app.put("/v1/wishes/:id", (c) => wishes.handleUpdate(c));
 app.delete("/v1/wishes/:id", (c) => wishes.handleDelete(c));
+
+// 评论（读 D1，改/删转发 Twikoo）
+app.get("/v1/comment", (c) => comment.handleList(c));
+app.get("/v1/comment/:id", (c) => comment.handleGet(c));
+app.put("/v1/comment/:id", (c) => comment.handleUpdate(c));
+app.delete("/v1/comment/:id", (c) => comment.handleDelete(c));
 
 app.all("/v1/*", (c) => c.json({ error: "接口不存在" }, 404));
 

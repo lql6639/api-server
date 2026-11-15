@@ -209,19 +209,19 @@ export async function handleDelete(c) {
 }
 
 export const meta = {
-  name: "分享",
+  name: "日常",
   description: "日常分享（说说），D1 存储，读公开写需 token",
   endpoints: [
     {
       method: "GET",
-      path: "/",
+      path: "",
       description: "分享列表",
       params: "?limit=100&offset=0",
     },
     { method: "GET", path: "/:id", description: "单条分享", params: ":id" },
     {
       method: "POST",
-      path: "/",
+      path: "",
       description: "新增分享",
       params: "token 鉴权",
     },

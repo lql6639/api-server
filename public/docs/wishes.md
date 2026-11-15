@@ -1,4 +1,4 @@
-# 心愿接口（/v1/wishes）
+# 心愿树洞接口（/v1/wishes）
 
 心情树洞（心愿 / 树洞），数据存 Cloudflare D1 数据库。**读公开、发布（POST）公开、修改/删除需 token 鉴权**。
 
@@ -55,24 +55,24 @@ curl 'https://server.lovlin.cn/v1/wishes/1'
 ### 发布（公开，无需 token）
 
 ```bash
-curl -X POST 'https://server.lovlin.cn/v1/wishes' \
-  -H 'Content-Type: application/json' \
+curl -X POST 'https://server.lovlin.cn/v1/wishes'
+  -H 'Content-Type: application/json'
   -d '{"content":"愿家人身体健康","nickname":"阿橘","color":"yellow","type":"wish","date":"2026/11/06"}'
 ```
 
 ### 修改（需 token）
 
 ```bash
-curl -X PUT 'https://server.lovlin.cn/v1/wishes/1' \
-  -H 'Content-Type: application/json' \
-  -H 'X-Wishes-Token: <token>' \
+curl -X PUT 'https://server.lovlin.cn/v1/wishes/1'
+  -H 'Content-Type: application/json'
+  -H 'X-Wishes-Token: <token>'
   -d '{"content":"修改后的内容","color":"pink","type":"treehole"}'
 ```
 
 ### 删除（需 token）
 
 ```bash
-curl -X DELETE 'https://server.lovlin.cn/v1/wishes/1' \
+curl -X DELETE 'https://server.lovlin.cn/v1/wishes/1'
   -H 'X-Wishes-Token: <token>'
 ```
 

@@ -298,7 +298,7 @@ export const meta = {
   endpoints: [
     {
       method: "GET",
-      path: "/",
+      path: "",
       description: "查询 当前/指定 IP",
       params: "?ip=x.x.x.x",
     },
