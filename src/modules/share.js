@@ -58,7 +58,6 @@ function rowToDto(row) {
     text: row.text || "",
     images: images ?? 0,
     location: row.location || "",
-    status: row.status ?? 0,
   };
 }
 

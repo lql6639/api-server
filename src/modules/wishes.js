@@ -12,7 +12,7 @@ const SCHEMA = `
     color TEXT,
     type TEXT,
     date TEXT,
-    created_at INTEGER
+    status INTEGER NOT NULL DEFAULT 0
   )
 `;
 
@@ -48,18 +48,44 @@ function rowToDto(row) {
     color: row.color || "green",
     type: row.type || "wish",
     date: row.date || "",
-    createdAt: row.created_at || null,
   };
 }
 
-// 入参 → 落库字段
+// 可选的颜色枚举（与前端 COLORS 一致）
+const VALID_COLORS = ["blue", "pink", "green", "orange", "yellow", "purple"];
+
+// 入参 → 落库字段（含校验）
+// 返回 { data } 或 { error }，调用处根据有无 error 判断是否通过
 function normalizeInput(body) {
   const content = String(body?.content || "").trim();
   const nickname = String(body?.nickname || "").trim();
   const color = String(body?.color || "green").trim();
   const type = body?.type === "treehole" ? "treehole" : "wish";
   const date = String(body?.date || "").trim();
-  return { content, nickname, color, type, date };
+
+  // 校验 content：非空 + 长度 50（与前端 MAX_LEN 一致）
+  if (!content) return { error: "content 不能为空" };
+  if (content.length > 50) {
+    return { error: `content 最多 50 个字，当前 ${content.length} 个` };
+  }
+
+  // 校验 nickname：长度 10
+  if (nickname.length > 10) {
+    return { error: `nickname 最多 10 个字，当前 ${nickname.length} 个` };
+  }
+
+  // 校验 color：枚举
+  if (!VALID_COLORS.includes(color)) {
+    return { error: `color 必须是 ${VALID_COLORS.join("/")} 之一` };
+  }
+
+  // 校验 date 格式：YYYY/MM/DD
+  if (!date) return { error: "date 不能为空" };
+  if (!/^\d{4}\/\d{2}\/\d{2}$/.test(date)) {
+    return { error: "date 格式应为 YYYY/MM/DD" };
+  }
+
+  return { data: { content, nickname, color, type, date } };
 }
 
 export async function handleList(c) {
@@ -76,13 +102,13 @@ export async function handleList(c) {
 
     // 按 type 过滤（可选）
     const type = String(c.req.query("type") || "").trim();
-    let sql = `SELECT * FROM ${TABLE}`;
+    let sql = `SELECT * FROM ${TABLE} WHERE status = 0`;
     const params = [];
     if (type === "wish" || type === "treehole") {
-      sql += ` WHERE type = ?`;
+      sql += ` AND type = ?`;
       params.push(type);
     }
-    sql += ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+    sql += ` ORDER BY date DESC LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
     const { results } = await db
@@ -107,7 +133,7 @@ export async function handleGet(c) {
       return c.json({ success: false, message: "无效的 id" }, 400);
 
     const row = await db
-      .prepare(`SELECT * FROM ${TABLE} WHERE id = ?`)
+      .prepare(`SELECT * FROM ${TABLE} WHERE id = ? AND status = 0`)
       .bind(id)
       .first();
     if (!row) return c.json({ success: false, message: "心愿不存在" }, 404);
@@ -124,26 +150,17 @@ export async function handleCreate(c) {
 
   try {
     await ensureSchema(db);
-    const { content, nickname, color, type, date } = normalizeInput(
-      await c.req.json(),
-    );
-    if (!content) {
-      return c.json({ success: false, message: "content 必填" }, 400);
+    const parsed = normalizeInput(await c.req.json());
+    if (parsed.error) {
+      return c.json({ success: false, message: parsed.error }, 400);
     }
-    // 内容长度限制：50 字（与前端 MAX_LEN 一致）
-    if (content.length > 50) {
-      return c.json({ success: false, message: "内容最多 50 个字" }, 400);
-    }
-    if (nickname.length > 10) {
-      return c.json({ success: false, message: "昵称最多 10 个字" }, 400);
-    }
+    const { content, nickname, color, type, date } = parsed.data;
 
-    const now = Date.now();
     const result = await db
       .prepare(
-        `INSERT INTO ${TABLE} (content, nickname, color, type, date, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${TABLE} (content, nickname, color, type, date) VALUES (?, ?, ?, ?, ?)`,
       )
-      .bind(content, nickname || "匿名", color, type, date, now)
+      .bind(content, nickname || "匿名", color, type, date)
       .run();
 
     return c.json({
@@ -167,12 +184,15 @@ export async function handleUpdate(c) {
     if (!Number.isFinite(id))
       return c.json({ success: false, message: "无效的 id" }, 400);
 
-    const { content, nickname, color, type, date } = normalizeInput(
-      await c.req.json(),
-    );
+    const parsed = normalizeInput(await c.req.json());
+    if (parsed.error) {
+      return c.json({ success: false, message: parsed.error }, 400);
+    }
+    const { content, nickname, color, type, date } = parsed.data;
+
     const result = await db
       .prepare(
-        `UPDATE ${TABLE} SET content = ?, nickname = ?, color = ?, type = ?, date = ? WHERE id = ?`,
+        `UPDATE ${TABLE} SET content = ?, nickname = ?, color = ?, type = ?, date = ? WHERE id = ? AND status = 0`,
       )
       .bind(content, nickname || "匿名", color, type, date, id)
       .run();
@@ -197,8 +217,9 @@ export async function handleDelete(c) {
     if (!Number.isFinite(id))
       return c.json({ success: false, message: "无效的 id" }, 400);
 
+    // 软删除：标记 status=1，不物理删除数据
     const result = await db
-      .prepare(`DELETE FROM ${TABLE} WHERE id = ?`)
+      .prepare(`UPDATE ${TABLE} SET status = 1 WHERE id = ? AND status = 0`)
       .bind(id)
       .run();
     if (!result.meta?.changes)
