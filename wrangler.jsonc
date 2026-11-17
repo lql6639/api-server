@@ -50,8 +50,8 @@
     },
     {
       "binding": "STATS_DB",
-      "database_name": "koizora-stats",
-      "database_id": "2751d07a-6bf6-4b8a-9141-05e21877871d"
+      "database_name": "stats",
+      "database_id": "e6537ff1-d09b-438c-b205-cd05b755da05"
     }
   ],
 }
