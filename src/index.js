@@ -11,7 +11,6 @@ import docShare from "../public/docs/share.md";
 import docWishes from "../public/docs/wishes.md";
 import docComment from "../public/docs/comment.md";
 import docStats from "../public/docs/stats.md";
-import docCounter from "../public/docs/counter.md";
 import * as img from "./modules/img.js";
 import * as ipinfo from "./modules/ipinfo.js";
 import * as weather from "./modules/weather.js";
@@ -19,7 +18,6 @@ import * as share from "./modules/share.js";
 import * as wishes from "./modules/wishes.js";
 import * as comment from "./modules/comment.js";
 import * as stats from "./modules/stats.js";
-import * as counter from "./modules/counter.js";
 import { getClientIp } from "./lib/ip.js";
 
 const PROJECT_NAME = "API Server";
@@ -35,7 +33,6 @@ const modules = [
   { id: "wishes", ...wishes.meta },
   { id: "stats", ...stats.meta },
   { id: "comment", ...comment.meta },
-  { id: "counter", ...counter.meta },
 ];
 
 const docs = {
@@ -46,7 +43,6 @@ const docs = {
   "share.md": docShare,
   "wishes.md": docWishes,
   "stats.md": docStats,
-  "counter.md": docCounter,
   "comment.md": docComment,
 };
 
@@ -230,9 +226,6 @@ app.delete("/v1/comment/:id", (c) => comment.handleDelete(c));
 // 站点统计（PV / UV）
 app.get("/v1/stats", (c) => stats.handleStats(c));
 app.post("/v1/stats", (c) => stats.handleReport(c));
-
-// Twikoo counter 表的页面标题校正
-app.post("/v1/counter/title", (c) => counter.handleSyncTitle(c));
 
 app.all("/v1/*", (c) => c.json({ error: "接口不存在" }, 404));
 
