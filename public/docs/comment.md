@@ -12,7 +12,7 @@
 | `GET`    | `/v1/comment/:id`   | 单条评论                 | 公开  |
 | `PUT`    | `/v1/comment/:id`   | 修改评论                 | token |
 | `DELETE` | `/v1/comment/:id`   | 删除评论                 | token |
-| `PUT`    | `/v1/comment/counter` | 校正 counter 表页面标题 | token |
+| `PUT`    | `/v1/comment/title`   | 校正标题                 | token |
 
 ## 鉴权
 
@@ -106,14 +106,14 @@ curl -X DELETE 'https://server.lovlin.cn/v1/comment/xxxxxxxx'
 
 列表按 `created` 倒序，只返回非垃圾评论（`isSpam = 0`）。
 
-## 校正页面标题（counter 表）
+## 校正标题
 
-Twikoo 的 `counter` 表只在**首次**记录某个 url 时写入 `title`，之后改文章标题它不会更新，管理面板里会一直显示旧标题。这个接口直接改它库里的标题，不动 `time`。
+Twikoo 只在**首次**记录某个 url 时写入标题，之后改文章标题它不会更新，管理面板里会一直显示旧标题。这个接口直接把标题改正过来，不动访问计数。
 
 单条：
 
 ```bash
-curl -X PUT 'https://server.lovlin.cn/v1/comment/counter' \
+curl -X PUT 'https://server.lovlin.cn/v1/comment/title' \
   -H 'Content-Type: application/json' \
   -H 'X-Twikoo-Key: <token>' \
   -d '{"url":"/posts/2024/0504","title":"分布式版本控制工具 | koizora"}'
@@ -122,7 +122,7 @@ curl -X PUT 'https://server.lovlin.cn/v1/comment/counter' \
 批量（改完多篇标题时一次同步，上限 200 条）：
 
 ```bash
-curl -X PUT 'https://server.lovlin.cn/v1/comment/counter' \
+curl -X PUT 'https://server.lovlin.cn/v1/comment/title' \
   -H 'Content-Type: application/json' \
   -H 'X-Twikoo-Key: <token>' \
   -d '{"items":[

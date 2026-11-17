@@ -192,10 +192,10 @@ export async function handleDelete(c) {
   );
 }
 
-// PUT /v1/comment/counter —— 校正 counter 表的页面标题。
+// PUT /v1/comment/title —— 校正页面标题。
 // Twikoo 只在首次记录某个 url 时写 title，之后改文章标题它不会更新，
 // 这里直接改它库里的 title（只动已存在的记录，不动 time）。
-export async function handleSyncCounterTitle(c) {
+export async function handleUpdateTitle(c) {
   if (!isAuthorized(c))
     return c.json({ success: false, message: "未授权" }, 401);
 
@@ -291,8 +291,8 @@ export const meta = {
     },
     {
       method: "PUT",
-      path: "/counter",
-      description: "校正 counter 表的页面标题",
+      path: "/title",
+      description: "校正标题",
       params: "token 鉴权，body: { url, title } 或 { items: [{ url, title }] }",
     },
   ],
