@@ -11,6 +11,7 @@
 | 心愿树洞 | `/v1/wishes`  | 心情树洞（心愿/树洞），D1 存储，发布公开改删需 token |
 | 评论     | `/v1/comment` | 评论管理，读 D1 存储、改删转发 Twikoo                |
 | 站点统计 | `/v1/stats`   | PV / UV 统计，D1 存储，读写公开                      |
+| 标题同步 | `/v1/counter/title` | 校正 Twikoo counter 表的页面标题，公开        |
 
 查看所有端点：`GET /v1/meta`
 
@@ -56,3 +57,4 @@ curl 'https://server.lovlin.cn/v1/stats'
 - [心愿](wishes.md)
 - [评论](comment.md)
 - [站点统计](stats.md)
+- [标题同步](counter.md)
