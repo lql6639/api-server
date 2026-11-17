@@ -96,7 +96,7 @@ curl -X DELETE 'https://server.lovlin.cn/v1/wishes/1'
 }
 ```
 
-列表按 `id` 升序（较早发布在前），`limit` 默认 200（上限 200），`offset` 默认 0，`type` 可选过滤。
+列表按 `date` 倒序（新的在前），同一天的两条按 `id` 倒序；`limit` 默认 200（上限 200），`offset` 默认 0，`type` 可选过滤。
 
 ## 错误响应
 

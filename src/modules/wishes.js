@@ -108,7 +108,15 @@ export async function handleList(c) {
       sql += ` AND type = ?`;
       params.push(type);
     }
-    sql += ` ORDER BY date DESC LIMIT ? OFFSET ?`;
+    // date 存的是 Y/M/D（月、日不补零），直接按字符串排会把 2026/12/9 排在
+    // 2026/12/10 前面，所以拆成年/月/日三段按整数比较；
+    // 同一天的两条按 id 倒序，保证后发布的在前（与 /v1/share 的倒序一致）。
+    sql += ` ORDER BY
+        CAST(substr(date, 1, 4) AS INTEGER) DESC,
+        CAST(substr(date, 6, instr(substr(date, 6), '/') - 1) AS INTEGER) DESC,
+        CAST(substr(date, 6 + instr(substr(date, 6), '/')) AS INTEGER) DESC,
+        id DESC
+      LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
     const { results } = await db

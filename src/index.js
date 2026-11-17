@@ -31,8 +31,8 @@ const modules = [
   { id: "img", ...img.meta },
   { id: "share", ...share.meta },
   { id: "wishes", ...wishes.meta },
-  { id: "comment", ...comment.meta },
   { id: "stats", ...stats.meta },
+  { id: "comment", ...comment.meta },
 ];
 
 const docs = {
@@ -42,8 +42,8 @@ const docs = {
   "img.md": docImg,
   "share.md": docShare,
   "wishes.md": docWishes,
-  "comment.md": docComment,
   "stats.md": docStats,
+  "comment.md": docComment,
 };
 
 // 与旧版 utils/markdownRenderer.js 一致的消毒逻辑
