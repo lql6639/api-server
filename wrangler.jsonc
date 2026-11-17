@@ -47,6 +47,11 @@
       "binding": "TWIKOO_DB",
       "database_name": "twikoo",
       "database_id": "907867cc-8c6a-406e-9c0a-4c17341a6fac"
+    },
+    {
+      "binding": "STATS_DB",
+      "database_name": "koizora-stats",
+      "database_id": "2751d07a-6bf6-4b8a-9141-05e21877871d"
     }
   ],
 }

@@ -10,6 +10,7 @@
 | 分享     | `/v1/share`   | 日常分享（说说），D1 存储，读公开写需 token          |
 | 心愿树洞 | `/v1/wishes`  | 心情树洞（心愿/树洞），D1 存储，发布公开改删需 token |
 | 评论     | `/v1/comment` | 评论管理，读 D1 存储、改删转发 Twikoo                |
+| 站点统计 | `/v1/stats`   | PV / UV 统计，D1 存储，读写公开                      |
 
 查看所有端点：`GET /v1/meta`
 
@@ -41,6 +42,9 @@ curl 'https://server.lovlin.cn/v1/wishes'
 
 # 评论列表
 curl 'https://server.lovlin.cn/v1/comment'
+
+# 站点统计
+curl 'https://server.lovlin.cn/v1/stats'
 ```
 
 ## 详细文档
@@ -51,3 +55,4 @@ curl 'https://server.lovlin.cn/v1/comment'
 - [分享](share.md)
 - [心愿](wishes.md)
 - [评论](comment.md)
+- [站点统计](stats.md)

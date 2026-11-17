@@ -34,7 +34,6 @@ X-Wishes-Token: <token>
 | `color`     | string | 颜色：blue/pink/green/orange/yellow/purple |
 | `type`      | string | `wish`（心愿）或 `treehole`（树洞）        |
 | `date`      | string | 日期，如 `2026/11/14`                      |
-| `createdAt` | number | 创建时间戳（毫秒）                         |
 
 ## 调用示例
 
@@ -91,14 +90,13 @@ curl -X DELETE 'https://server.lovlin.cn/v1/wishes/1'
       "nickname": "阿橘",
       "color": "yellow",
       "type": "wish",
-      "date": "2026/11/06",
-      "createdAt": 1731672000000
+      "date": "2026/11/06"
     }
   ]
 }
 ```
 
-列表按 `id` 倒序（最新发布在前），`limit` 默认 200（上限 200），`offset` 默认 0，`type` 可选过滤。
+列表按 `id` 升序（较早发布在前），`limit` 默认 200（上限 200），`offset` 默认 0，`type` 可选过滤。
 
 ## 错误响应
 

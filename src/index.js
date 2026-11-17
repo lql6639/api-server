@@ -10,12 +10,14 @@ import docWeather from "../public/docs/weather.md";
 import docShare from "../public/docs/share.md";
 import docWishes from "../public/docs/wishes.md";
 import docComment from "../public/docs/comment.md";
+import docStats from "../public/docs/stats.md";
 import * as img from "./modules/img.js";
 import * as ipinfo from "./modules/ipinfo.js";
 import * as weather from "./modules/weather.js";
 import * as share from "./modules/share.js";
 import * as wishes from "./modules/wishes.js";
 import * as comment from "./modules/comment.js";
+import * as stats from "./modules/stats.js";
 import { getClientIp } from "./lib/ip.js";
 
 const PROJECT_NAME = "API Server";
@@ -30,6 +32,7 @@ const modules = [
   { id: "share", ...share.meta },
   { id: "wishes", ...wishes.meta },
   { id: "comment", ...comment.meta },
+  { id: "stats", ...stats.meta },
 ];
 
 const docs = {
@@ -40,6 +43,7 @@ const docs = {
   "share.md": docShare,
   "wishes.md": docWishes,
   "comment.md": docComment,
+  "stats.md": docStats,
 };
 
 // 与旧版 utils/markdownRenderer.js 一致的消毒逻辑
@@ -139,7 +143,7 @@ app.use(
   "*",
   cors({
     origin: "*",
-    allowMethods: ["GET", "HEAD", "OPTIONS"],
+    allowMethods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
     maxAge: 86400,
   }),
 );
@@ -218,6 +222,10 @@ app.get("/v1/comment", (c) => comment.handleList(c));
 app.get("/v1/comment/:id", (c) => comment.handleGet(c));
 app.put("/v1/comment/:id", (c) => comment.handleUpdate(c));
 app.delete("/v1/comment/:id", (c) => comment.handleDelete(c));
+
+// 站点统计（PV / UV）
+app.get("/v1/stats", (c) => stats.handleStats(c));
+app.post("/v1/stats", (c) => stats.handleReport(c));
 
 app.all("/v1/*", (c) => c.json({ error: "接口不存在" }, 404));
 

@@ -34,7 +34,6 @@ token 通过 `wrangler secret put SHARE_TOKEN` 配置在 Cloudflare 环境变量
 | `text`      | string | 分享文字                        |
 | `images`    | number | 图片数量                        |
 | `location`  | string | 位置                            |
-| `createdAt` | number | 创建时间戳（毫秒）              |
 
 ## 调用示例
 
@@ -91,8 +90,7 @@ curl -X DELETE 'https://server.lovlin.cn/v1/share/1'
       "device": "IPhone",
       "text": "大街上已经开始飘荡着糖炒栗子和烤红薯的香味了。",
       "images": 2,
-      "location": "江门",
-      "createdAt": 1731588060000
+      "location": "江门"
     }
   ]
 }
