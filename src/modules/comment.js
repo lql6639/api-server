@@ -3,8 +3,26 @@
 // 转发写操作时，用 TWIKOO_ADMIN_TOKEN（= md5(Twikoo 管理密码)）作为 accessToken 冒充管理员。
 
 const TABLE = "comment";
+// Twikoo 的页面访问计数表（url / title / time / created / updated）
+const COUNTER_TABLE = "counter";
+const COUNTER_TITLE_MAX = 200;
 // Twikoo 部署地址（评论事件接口）
 const TWIKOO_BASE = "https://twikoo.lovlin.cn";
+
+// 统一成站内相对路径（cleanUrls 下文章地址不带 .html）
+function normalizeCounterUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  let path = raw;
+  try {
+    path = new URL(raw, "https://blog.lovlin.cn").pathname;
+  } catch {
+    path = raw.split(/[?#]/)[0];
+  }
+  path = path.split(/[?#]/)[0].slice(0, COUNTER_TITLE_MAX);
+  if (!path.startsWith("/")) return "";
+  return path;
+}
 
 // 从请求中提取鉴权 token（请求头优先，其次 query）
 function getToken(c) {
@@ -174,6 +192,80 @@ export async function handleDelete(c) {
   );
 }
 
+// PUT /v1/comment/counter —— 校正 counter 表的页面标题。
+// Twikoo 只在首次记录某个 url 时写 title，之后改文章标题它不会更新，
+// 这里直接改它库里的 title（只动已存在的记录，不动 time）。
+export async function handleSyncCounterTitle(c) {
+  if (!isAuthorized(c))
+    return c.json({ success: false, message: "未授权" }, 401);
+
+  const db = c.env?.TWIKOO_DB;
+  if (!db) return c.json({ success: false, message: "评论数据库未绑定" }, 500);
+
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return c.json({ success: false, message: "请求体需为 JSON" }, 400);
+  }
+
+  // 支持单条 { url, title }，也支持批量 { items: [{ url, title }] }
+  const rawItems = Array.isArray(body.items) ? body.items : [body];
+  if (rawItems.length === 0) {
+    return c.json({ success: false, message: "items 不能为空" }, 400);
+  }
+  if (rawItems.length > 200) {
+    return c.json({ success: false, message: "一次最多同步 200 条" }, 400);
+  }
+
+  const items = [];
+  for (const raw of rawItems) {
+    const url = normalizeCounterUrl(raw?.url);
+    const title = String(raw?.title || "")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (!url) {
+      return c.json(
+        { success: false, message: `url 不合法：${raw?.url ?? ""}` },
+        400,
+      );
+    }
+    if (!title) {
+      return c.json({ success: false, message: `title 不能为空：${url}` }, 400);
+    }
+    if (title.length > COUNTER_TITLE_MAX) {
+      return c.json({ success: false, message: `title 过长：${url}` }, 400);
+    }
+    items.push({ url, title });
+  }
+
+  try {
+    const now = Date.now();
+    // WHERE 带 title <> ?：标题没变时不产生写入
+    const results = await db.batch(
+      items.map((it) =>
+        db
+          .prepare(
+            `UPDATE ${COUNTER_TABLE} SET title = ?, updated = ? WHERE url = ? AND title <> ?`,
+          )
+          .bind(it.title, now, it.url, it.title),
+      ),
+    );
+    const changed = results.reduce(
+      (sum, r) => sum + (Number(r?.meta?.changes) || 0),
+      0,
+    );
+    return c.json({
+      success: true,
+      data: {
+        total: items.length,
+        changed,
+        unchanged: items.length - changed,
+      },
+    });
+  } catch (e) {
+    return c.json({ success: false, message: String(e?.message || e) }, 500);
+  }
+}
+
 export const meta = {
   name: "Twikoo",
   description: "评论管理（读 D1 存储，改/删转发 Twikoo），读公开改删需 token",
@@ -196,6 +288,12 @@ export const meta = {
       path: "/:id",
       description: "删除评论",
       params: "token 鉴权，转发 Twikoo",
+    },
+    {
+      method: "PUT",
+      path: "/counter",
+      description: "校正 counter 表的页面标题",
+      params: "token 鉴权，body: { url, title } 或 { items: [{ url, title }] }",
     },
   ],
 };

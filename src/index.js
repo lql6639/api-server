@@ -219,6 +219,8 @@ app.delete("/v1/wishes/:id", (c) => wishes.handleDelete(c));
 
 // 评论（读 D1，改/删转发 Twikoo）
 app.get("/v1/comment", (c) => comment.handleList(c));
+// 校正 counter 标题必须放在 /:id 之前，否则会被当成 id
+app.put("/v1/comment/counter", (c) => comment.handleSyncCounterTitle(c));
 app.get("/v1/comment/:id", (c) => comment.handleGet(c));
 app.put("/v1/comment/:id", (c) => comment.handleUpdate(c));
 app.delete("/v1/comment/:id", (c) => comment.handleDelete(c));
