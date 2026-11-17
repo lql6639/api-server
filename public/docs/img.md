@@ -23,7 +23,7 @@
 curl -L https://server.lovlin.cn/v1/img
 ```
 
-响应：`302 Found` → `Location: https://server.lovlin.cn/image/background/xxx.png`
+响应：`302 Found` → `Location: https://t.alcy.cc/pc`（横屏）/ `https://t.alcy.cc/mp`（竖屏）
 
 ## JSON
 
@@ -37,21 +37,21 @@ curl https://server.lovlin.cn/v1/img?type=json
   "time": 1730000000000,
   "data": {
     "id": "1",
-    "name": "100066591_p0.png",
-    "url": "https://server.lovlin.cn/image",
-    "path": "/background/100066591_p0.png",
-    "fullUrl": "https://server.lovlin.cn/image/background/100066591_p0.png"
+    "name": "pc",
+    "url": "https://t.alcy.cc/pc",
+    "path": "/pc",
+    "fullUrl": "https://t.alcy.cc/pc"
   }
 }
 ```
 
-| 字段           | 类型   | 说明         |
-| -------------- | ------ | ------------ |
-| `data.id`      | string | 序号         |
-| `data.name`    | string | 文件名       |
-| `data.url`     | string | 基础 URL     |
-| `data.path`    | string | 图片路径     |
-| `data.fullUrl` | string | 完整图片 URL |
+| 字段           | 类型   | 说明                          |
+| -------------- | ------ | ----------------------------- |
+| `data.id`      | string | 序号                          |
+| `data.name`    | string | 上游标识（pc / mp）           |
+| `data.url`     | string | 基础 URL（直出模式为上游地址）|
+| `data.path`    | string | 图片路径                      |
+| `data.fullUrl` | string | 完整图片 URL                  |
 
 ## 纯文本
 
@@ -60,7 +60,7 @@ curl https://server.lovlin.cn/v1/img?type=text
 ```
 
 ```js
-https://server.lovlin.cn/image/background/100066591_p0.png
+https://t.alcy.cc/pc
 ```
 
 ## 图片流

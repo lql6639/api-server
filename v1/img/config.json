@@ -4,12 +4,12 @@
   "cache_ttl": 86400,
   "upstream": {
     "horizontal": [
-      "https://acg.suyanw.cn/gqbz/random.php",
-      "https://t.alcy.cc/pc"
+      "https://t.alcy.cc/pc",
+      "https://acg.suyanw.cn/gqbz/random.php"
     ],
     "vertical": [
-      "https://acg.suyanw.cn/sjdm/random.php",
-      "https://t.alcy.cc/mp"
+      "https://t.alcy.cc/mp",
+      "https://acg.suyanw.cn/sjdm/random.php"
     ]
   },
   "timeout_ms": 10000,
