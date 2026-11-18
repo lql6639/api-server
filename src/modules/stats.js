@@ -9,9 +9,6 @@ const SITE_TABLE = "stats_site";
 const PAGE_TABLE = "stats_pages";
 const VISITOR_TABLE = "stats_visitors";
 
-// 归属地查不到时的重试间隔：太短会每次访问都外呼一次，太长又补不上
-const GEO_RETRY_MS = 24 * 60 * 60 * 1000;
-
 // 时间统一按东八区存，形如 2026-11-19T04:01:48+08:00。
 // 必须带 +08:00：不带偏移的字符串会被各运行时按自己的时区解释，
 // Worker 跑在 UTC 下会把 04:01 当成 UTC，凭空产生 8 小时偏差。
@@ -33,9 +30,11 @@ const SCHEMA = [
     pv INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT ''
   )`,
+  // 一次访问一行：同一访客来几次就有几行。
+  // 主键用 (visitor, visits)：visitor 单独做不了主键（同一人会重复），
+  // visits 是「这是第几次访问」，两者组合天然唯一，也不用额外加自增 id。
   `CREATE TABLE IF NOT EXISTS ${VISITOR_TABLE} (
-    visitor TEXT PRIMARY KEY,
-    first_seen TEXT NOT NULL DEFAULT '',
+    visitor TEXT NOT NULL DEFAULT '',
     last_seen TEXT NOT NULL DEFAULT '',
     country TEXT NOT NULL DEFAULT '',
     province TEXT NOT NULL DEFAULT '',
@@ -49,7 +48,8 @@ const SCHEMA = [
     browser TEXT NOT NULL DEFAULT '',
     first_path TEXT NOT NULL DEFAULT '',
     last_path TEXT NOT NULL DEFAULT '',
-    visits INTEGER NOT NULL DEFAULT 0
+    visits INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (visitor, visits)
   )`,
 ];
 
@@ -132,7 +132,8 @@ function readNumber(result) {
 
 // 归属地：复用 ipinfo 的多上游查询（自带缓存）。
 // 不能走 HTTP 调自己的 /v1/ipinfo —— Cloudflare 不允许 Worker 调自己（522）。
-async function fillVisitorGeo(db, visitor, ip) {
+// 一次访问一行之后，只补写刚插入的那一行（visitor + visits 定位）。
+async function fillVisitorGeo(db, visitor, visits, ip) {
   let d;
   try {
     const info = await queryIpInfoWithRetry(ip);
@@ -158,7 +159,7 @@ async function fillVisitorGeo(db, visitor, ip) {
       .prepare(
         `UPDATE ${VISITOR_TABLE}
             SET country = ?, province = ?, city = ?, isp = ?, lon = ?, lat = ?
-          WHERE visitor = ?`,
+          WHERE visitor = ? AND visits = ?`,
       )
       .bind(
         geo.country,
@@ -168,6 +169,7 @@ async function fillVisitorGeo(db, visitor, ip) {
         geo.lon,
         geo.lat,
         visitor,
+        visits,
       )
       .run();
   } catch {
@@ -178,7 +180,10 @@ async function fillVisitorGeo(db, visitor, ip) {
 async function readStats(db, path) {
   const statements = [
     db.prepare(`SELECT pv FROM ${SITE_TABLE} WHERE id = 1`),
-    db.prepare(`SELECT COUNT(*) AS uv FROM ${VISITOR_TABLE}`),
+    // 一人多行了，访客数不能再按行数算
+    db.prepare(
+      `SELECT COUNT(DISTINCT visitor) AS uv FROM ${VISITOR_TABLE}`,
+    ),
   ];
   if (path) {
     statements.push(
@@ -233,14 +238,22 @@ export async function handleReport(c) {
   // Cloudflare 边缘带上来的国家代码，只作为归属地查不到时的兜底
   const cfCountry = c.req.raw.cf?.country || c.req.header("cf-ipcountry") || "";
 
-  // 先读旧记录：决定要不要补归属地，同时给下面判定「上次是什么时候来的」用
-  const existing = await db
+  // 上一次访问那一行：序号接着往上加；归属地也从这行抄，不用每次外呼
+  const prev = await db
     .prepare(
-      `SELECT country, province, lon, last_seen
-         FROM ${VISITOR_TABLE} WHERE visitor = ?`,
+      `SELECT country, province, city, isp, lon, lat, first_path, visits
+         FROM ${VISITOR_TABLE} WHERE visitor = ?
+        ORDER BY visits DESC LIMIT 1`,
     )
     .bind(visitor)
     .first();
+
+  const visits = Number(prev?.visits || 0) + 1;
+  // 这行已经带着完整归属地，就不用再查一次
+  const reusedGeo = !!(prev?.province && prev?.lon);
+  const geo = reusedGeo
+    ? prev
+    : { country: cfCountry, province: "", city: "", isp: "", lon: "", lat: "" };
 
   try {
     await db.batch([
@@ -256,52 +269,39 @@ export async function handleReport(c) {
            ON CONFLICT(path) DO UPDATE SET pv = pv + 1, updated_at = excluded.updated_at`,
         )
         .bind(path, now),
-      // country 只在还没值时用边缘国家码兜底，否则会把 geo 查到的中文名覆盖成两位码
+      // 一次访问一行，只追加不覆盖
       db
         .prepare(
           `INSERT INTO ${VISITOR_TABLE}
-             (visitor, first_seen, last_seen, ip, country, device, os, browser, visits, first_path, last_path)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-           ON CONFLICT(visitor) DO UPDATE SET
-             last_seen = excluded.last_seen,
-             last_path = excluded.last_path,
-             ip = excluded.ip,
-             country = CASE WHEN ${VISITOR_TABLE}.country = ''
-                            THEN excluded.country
-                            ELSE ${VISITOR_TABLE}.country END,
-             device = excluded.device,
-             os = excluded.os,
-             browser = excluded.browser,
-             visits = visits + 1`,
+             (visitor, last_seen, country, province, city, isp, ip, lon, lat,
+              device, os, browser, first_path, last_path, visits)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           visitor,
           now,
-          now,
+          geo.country,
+          geo.province,
+          geo.city,
+          geo.isp,
           ip,
-          cfCountry,
+          geo.lon,
+          geo.lat,
           device,
           os,
           browser,
+          prev?.first_path || path,
           path,
-          path,
+          visits,
         ),
     ]);
   } catch (error) {
     return c.json({ error: `统计写入失败：${error?.message || error}` }, 500);
   }
 
-  // 归属地不全才补：新访客直接查；老记录缺省市/经纬度时，一天最多重试一次，
-  // 否则上游一直查不到就会每次访问都外呼一遍
-  const hasGeo =
-    !!existing?.province &&
-    !!existing?.lon &&
-    !/^[A-Z]{2}$/.test(String(existing?.country || ""));
-  const lastSeenAt = Date.parse(existing?.last_seen || "") || 0;
-  const retryDue = !existing || Date.now() - lastSeenAt > GEO_RETRY_MS;
-
-  if (!hasGeo && retryDue) {
-    const task = fillVisitorGeo(db, visitor, ip);
+  // 全新访客（或者上一行归属地就是空的）才去查一次，写完只更新刚插入的那行
+  if (!reusedGeo) {
+    const task = fillVisitorGeo(db, visitor, visits, ip);
     try {
       c.executionCtx.waitUntil(task);
     } catch {

@@ -83,10 +83,11 @@ fetch('https://server.lovlin.cn/v1/stats', {
 
 ## 数据表
 
-| 表              | 说明                                     |
-| --------------- | ---------------------------------------- |
-| `stats_site`    | 站点累计 PV（单行，`id = 1`）            |
-| `stats_pages`   | 按路径累计 PV                            |
-| `stats_visitors`| 访客哈希去重表，UV = `COUNT(*)`          |
+| 表              | 说明                                                       |
+| --------------- | ---------------------------------------------------------- |
+| `stats_site`    | 站点累计 PV（单行，`id = 1`）                              |
+| `stats_pages`   | 按路径累计 PV                                              |
+| `stats_visitors`| 访问流水，一次访问一行；UV = `COUNT(DISTINCT visitor)`     |
 
-首次访问时自动建表，无需手动初始化。
+`stats_visitors` 只追加不覆盖：同一访客来三次就是三行，`visits` 分别是 1、2、3，
+主键为 `(visitor, visits)`。归属地按访客首次访问时查一次，后续行直接沿用。
