@@ -24,7 +24,7 @@ const SCHEMA = [
     visitor TEXT PRIMARY KEY,
     first_seen TEXT NOT NULL DEFAULT '',
     last_seen TEXT NOT NULL DEFAULT '',
-    ip_prefix TEXT NOT NULL DEFAULT '',
+    ip TEXT NOT NULL DEFAULT '',
     country TEXT NOT NULL DEFAULT '',
     province TEXT NOT NULL DEFAULT '',
     city TEXT NOT NULL DEFAULT '',
@@ -40,7 +40,7 @@ const SCHEMA = [
 
 // 老库补列：CREATE TABLE IF NOT EXISTS 不会改动已存在的表
 const VISITOR_EXTRA_COLUMNS = [
-  ["ip_prefix", "TEXT NOT NULL DEFAULT ''"],
+  ["ip", "TEXT NOT NULL DEFAULT ''"],
   ["country", "TEXT NOT NULL DEFAULT ''"],
   ["province", "TEXT NOT NULL DEFAULT ''"],
   ["city", "TEXT NOT NULL DEFAULT ''"],
@@ -131,8 +131,8 @@ async function buildVisitorId(request) {
   const visitor = Array.from(new Uint8Array(digest).slice(0, 12))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
-  // 只留网段，不存完整 IP，能看出大致来源又不至于精确到个人
-  return { visitor, ipPrefix: prefix };
+  // visitor 仍按网段算（UV 口径不变），另外把完整 IP 一起带出去存表
+  return { visitor, ip };
 }
 
 function readNumber(result) {
@@ -215,7 +215,7 @@ export async function handleReport(c) {
   }
   const path = normalizePath(body?.path ?? c.req.query("path"));
   const now = new Date().toISOString();
-  const { visitor, ipPrefix } = await buildVisitorId(c.req.raw);
+  const { visitor, ip } = await buildVisitorId(c.req.raw);
   const { device, os, browser } = parseUa(ua);
   // Cloudflare 边缘带上来的国家代码，本地开发没有这个值
   const country =
@@ -244,18 +244,19 @@ export async function handleReport(c) {
       db
         .prepare(
           `INSERT INTO ${VISITOR_TABLE}
-             (visitor, first_seen, last_seen, ip_prefix, country, device, os, browser, visits, first_path, last_path)
+             (visitor, first_seen, last_seen, ip, country, device, os, browser, visits, first_path, last_path)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
            ON CONFLICT(visitor) DO UPDATE SET
              last_seen = excluded.last_seen,
              last_path = excluded.last_path,
+             ip = excluded.ip,
              country = excluded.country,
              device = excluded.device,
              os = excluded.os,
              browser = excluded.browser,
              visits = visits + 1`,
         )
-        .bind(visitor, now, now, ipPrefix, country, device, os, browser, path, path),
+        .bind(visitor, now, now, ip, country, device, os, browser, path, path),
     ]);
   } catch (error) {
     return c.json({ error: `统计写入失败：${error?.message || error}` }, 500);
