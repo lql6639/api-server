@@ -24,11 +24,13 @@ const SCHEMA = [
     visitor TEXT PRIMARY KEY,
     first_seen TEXT NOT NULL DEFAULT '',
     last_seen TEXT NOT NULL DEFAULT '',
-    ip TEXT NOT NULL DEFAULT '',
     country TEXT NOT NULL DEFAULT '',
     province TEXT NOT NULL DEFAULT '',
     city TEXT NOT NULL DEFAULT '',
+    area TEXT NOT NULL DEFAULT '',
     isp TEXT NOT NULL DEFAULT '',
+    ip_ipv4 TEXT NOT NULL DEFAULT '',
+    ip_ipv6 TEXT NOT NULL DEFAULT '',
     device TEXT NOT NULL DEFAULT '',
     os TEXT NOT NULL DEFAULT '',
     browser TEXT NOT NULL DEFAULT '',
@@ -40,11 +42,13 @@ const SCHEMA = [
 
 // 老库补列：CREATE TABLE IF NOT EXISTS 不会改动已存在的表
 const VISITOR_EXTRA_COLUMNS = [
-  ["ip", "TEXT NOT NULL DEFAULT ''"],
   ["country", "TEXT NOT NULL DEFAULT ''"],
   ["province", "TEXT NOT NULL DEFAULT ''"],
   ["city", "TEXT NOT NULL DEFAULT ''"],
+  ["area", "TEXT NOT NULL DEFAULT ''"],
   ["isp", "TEXT NOT NULL DEFAULT ''"],
+  ["ip_ipv4", "TEXT NOT NULL DEFAULT ''"],
+  ["ip_ipv6", "TEXT NOT NULL DEFAULT ''"],
   ["device", "TEXT NOT NULL DEFAULT ''"],
   ["os", "TEXT NOT NULL DEFAULT ''"],
   ["browser", "TEXT NOT NULL DEFAULT ''"],
@@ -82,7 +86,9 @@ async function ensureSchema(db) {
 function parseUa(ua) {
   const s = String(ua || "");
   const isTablet = /iPad|Tablet/i.test(s);
-  const isMobile = /Mobile|Android|iPhone|iPod|HarmonyOS|Windows Phone/i.test(s);
+  const isMobile = /Mobile|Android|iPhone|iPod|HarmonyOS|Windows Phone/i.test(
+    s,
+  );
   const device = isTablet ? "tablet" : isMobile ? "mobile" : "desktop";
 
   let os = "其它";
@@ -131,8 +137,8 @@ async function buildVisitorId(request) {
   const visitor = Array.from(new Uint8Array(digest).slice(0, 12))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
-  // visitor 仍按网段算（UV 口径不变），另外把完整 IP 一起带出去存表
-  return { visitor, ip };
+  // visitor 仍按网段算（UV 口径不变），完整 IP 按协议分开存两列
+  return { visitor, ip, ipv4: kind === 4 ? ip : "", ipv6: kind === 6 ? ip : "" };
 }
 
 function readNumber(result) {
@@ -140,20 +146,63 @@ function readNumber(result) {
   return Number(row?.pv ?? row?.uv ?? 0) || 0;
 }
 
-// 补归属地：只有新访客、或老记录还缺省市时才查一次，结果写回 visitor 行
+// 归属地：优先 ip9.com.cn（能拿到区县），失败退回 ipinfo 的多上游容灾
+async function fetchGeoFromIp9(ip) {
+  const res = await fetch(
+    `https://ip9.com.cn/get?ip=${encodeURIComponent(ip)}`,
+    { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(6000) },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const d = json?.data;
+  if (!d) throw new Error("返回数据为空");
+  return {
+    country: String(d.country || "").slice(0, 20),
+    province: String(d.prov || "").slice(0, 40),
+    city: String(d.city || "").slice(0, 40),
+    area: String(d.area || "").slice(0, 40),
+    isp: String(d.isp || "").slice(0, 60),
+  };
+}
+
+async function fetchGeoFallback(ip) {
+  const info = await queryIpInfoWithRetry(ip);
+  const d = info?.data || {};
+  return {
+    country: String(d.country || "").slice(0, 20),
+    province: String(d.prov || "").slice(0, 40),
+    city: String(d.city || "").slice(0, 40),
+    area: "",
+    isp: String(d.isp || "").slice(0, 60),
+  };
+}
+
+// 只有新访客、或老记录还缺省市时才查一次，结果写回 visitor 行
 async function fillVisitorGeo(db, visitor, ip) {
+  let geo = null;
   try {
-    const info = await queryIpInfoWithRetry(ip);
-    const d = info?.data || {};
-    const province = String(d.prov || "").slice(0, 40);
-    const city = String(d.city || "").slice(0, 40);
-    const isp = String(d.isp || "").slice(0, 60);
-    if (!province && !city && !isp) return;
+    geo = await fetchGeoFromIp9(ip);
+  } catch {
+    geo = null;
+  }
+  if (!geo || (!geo.province && !geo.city)) {
+    try {
+      geo = await fetchGeoFallback(ip);
+    } catch {
+      // 两个来源都失败就空着
+    }
+  }
+  if (!geo) return;
+
+  const { country, province, city, area, isp } = geo;
+  if (!country && !province && !city && !area && !isp) return;
+
+  try {
     await db
       .prepare(
-        `UPDATE ${VISITOR_TABLE} SET province = ?, city = ?, isp = ? WHERE visitor = ?`,
+        `UPDATE ${VISITOR_TABLE} SET country = ?, province = ?, city = ?, area = ?, isp = ? WHERE visitor = ?`,
       )
-      .bind(province, city, isp, visitor)
+      .bind(country, province, city, area, isp, visitor)
       .run();
   } catch {
     // 归属地查不到不影响统计本身
@@ -167,9 +216,7 @@ async function readStats(db, path) {
   ];
   if (path) {
     statements.push(
-      db
-        .prepare(`SELECT pv FROM ${PAGE_TABLE} WHERE path = ?`)
-        .bind(path),
+      db.prepare(`SELECT pv FROM ${PAGE_TABLE} WHERE path = ?`).bind(path),
     );
   }
   const results = await db.batch(statements);
@@ -215,15 +262,16 @@ export async function handleReport(c) {
   }
   const path = normalizePath(body?.path ?? c.req.query("path"));
   const now = new Date().toISOString();
-  const { visitor, ip } = await buildVisitorId(c.req.raw);
+  const { visitor, ip, ipv4, ipv6 } = await buildVisitorId(c.req.raw);
   const { device, os, browser } = parseUa(ua);
   // Cloudflare 边缘带上来的国家代码，本地开发没有这个值
-  const country =
-    c.req.raw.cf?.country || c.req.header("cf-ipcountry") || "";
+  const country = c.req.raw.cf?.country || c.req.header("cf-ipcountry") || "";
 
   // 新访客、或老记录还缺省市的，事后补一次归属地（不阻塞这次响应）
   const existing = await db
-    .prepare(`SELECT province FROM ${VISITOR_TABLE} WHERE visitor = ?`)
+    .prepare(
+      `SELECT province, country FROM ${VISITOR_TABLE} WHERE visitor = ?`,
+    )
     .bind(visitor)
     .first();
 
@@ -244,26 +292,33 @@ export async function handleReport(c) {
       db
         .prepare(
           `INSERT INTO ${VISITOR_TABLE}
-             (visitor, first_seen, last_seen, ip, country, device, os, browser, visits, first_path, last_path)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+             (visitor, first_seen, last_seen, ip_ipv4, ip_ipv6, country, device, os, browser, visits, first_path, last_path)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
            ON CONFLICT(visitor) DO UPDATE SET
              last_seen = excluded.last_seen,
              last_path = excluded.last_path,
-             ip = excluded.ip,
+             ip_ipv4 = excluded.ip_ipv4,
+             ip_ipv6 = excluded.ip_ipv6,
              country = excluded.country,
              device = excluded.device,
              os = excluded.os,
              browser = excluded.browser,
              visits = visits + 1`,
         )
-        .bind(visitor, now, now, ip, country, device, os, browser, path, path),
+        .bind(visitor, now, now, ipv4, ipv6, country, device, os, browser, path, path),
     ]);
   } catch (error) {
     return c.json({ error: `统计写入失败：${error?.message || error}` }, 500);
   }
 
-  if (!existing || !existing.province) {
-    const task = fillVisitorGeo(db, visitor, getClientIp(c.req.raw));
+  // 还没有省市、或 country 还是 Cloudflare 的两位码（老数据），都补一次
+  const needsGeo =
+    !existing ||
+    !existing.province ||
+    /^[A-Z]{2}$/.test(String(existing.country || ""));
+
+  if (needsGeo) {
+    const task = fillVisitorGeo(db, visitor, ip);
     try {
       c.executionCtx.waitUntil(task);
     } catch {
