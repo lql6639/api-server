@@ -9,7 +9,11 @@ const SITE_TABLE = "stats_site";
 const PAGE_TABLE = "stats_pages";
 const VISITOR_TABLE = "stats_visitors";
 
+// 归属地查不到时的重试间隔：太短会每次访问都外呼一次，太长又补不上
+const GEO_RETRY_MS = 24 * 60 * 60 * 1000;
 
+// 建表语句只对空库生效，已存在的表不会被改成这里的结构。
+// 要改表结构就手动在远程库迁移（ALTER / 重建），不在这里维护第二份列定义。
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS ${SITE_TABLE} (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -41,23 +45,6 @@ const SCHEMA = [
   )`,
 ];
 
-// 老库补列：CREATE TABLE IF NOT EXISTS 不会改动已存在的表
-const VISITOR_EXTRA_COLUMNS = [
-  ["country", "TEXT NOT NULL DEFAULT ''"],
-  ["province", "TEXT NOT NULL DEFAULT ''"],
-  ["city", "TEXT NOT NULL DEFAULT ''"],
-  ["isp", "TEXT NOT NULL DEFAULT ''"],
-  ["ip", "TEXT NOT NULL DEFAULT ''"],
-  ["lon", "TEXT NOT NULL DEFAULT ''"],
-  ["lat", "TEXT NOT NULL DEFAULT ''"],
-  ["device", "TEXT NOT NULL DEFAULT ''"],
-  ["os", "TEXT NOT NULL DEFAULT ''"],
-  ["browser", "TEXT NOT NULL DEFAULT ''"],
-  ["visits", "INTEGER NOT NULL DEFAULT 0"],
-  ["first_path", "TEXT NOT NULL DEFAULT ''"],
-  ["last_path", "TEXT NOT NULL DEFAULT ''"],
-];
-
 // 爬虫/预渲染/命令行 UA 不计入，避免污染数据
 const BOT_UA =
   /(bot|spider|crawler|slurp|bingpreview|headless|phantom|curl|wget|python-requests|axios\/|okhttp|go-http-client|preview)/i;
@@ -67,18 +54,6 @@ async function ensureSchema(db) {
   if (schemaReady || !db) return;
   for (const statement of SCHEMA) {
     await db.prepare(statement).run();
-  }
-  // 已存在的表不会因为 CREATE TABLE IF NOT EXISTS 而变结构，缺的列单独补
-  const { results } = await db
-    .prepare(`PRAGMA table_info(${VISITOR_TABLE})`)
-    .all();
-  const existing = new Set((results || []).map((row) => row.name));
-  for (const [name, def] of VISITOR_EXTRA_COLUMNS) {
-    if (!existing.has(name)) {
-      await db
-        .prepare(`ALTER TABLE ${VISITOR_TABLE} ADD COLUMN ${name} ${def}`)
-        .run();
-    }
   }
   schemaReady = true;
 }
@@ -138,7 +113,7 @@ async function buildVisitorId(request) {
   const visitor = Array.from(new Uint8Array(digest).slice(0, 12))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
-  // visitor 仍按网段算（UV 口径不变），完整 IP 单独存一列
+  // visitor 按网段算（UV 口径），完整 IP 另外存一列
   return { visitor, ip };
 }
 
@@ -147,9 +122,8 @@ function readNumber(result) {
   return Number(row?.pv ?? row?.uv ?? 0) || 0;
 }
 
-// 归属地：直接复用 ipinfo 的多上游查询。
+// 归属地：复用 ipinfo 的多上游查询（自带缓存）。
 // 不能走 HTTP 调自己的 /v1/ipinfo —— Cloudflare 不允许 Worker 调自己（522）。
-// 只有新访客、或老记录还缺省市、或 country 仍是两位码时才查。
 async function fillVisitorGeo(db, visitor, ip) {
   let d;
   try {
@@ -160,20 +134,33 @@ async function fillVisitorGeo(db, visitor, ip) {
     return;
   }
 
-  const country = String(d.country || "").slice(0, 20);
-  const province = String(d.prov || "").slice(0, 40);
-  const city = String(d.city || "").slice(0, 40);
-  const isp = String(d.isp || "").slice(0, 60);
-  const lon = d.lon === undefined || d.lon === null ? "" : String(d.lon).slice(0, 20);
-  const lat = d.lat === undefined || d.lat === null ? "" : String(d.lat).slice(0, 20);
-  if (!country && !province && !city && !isp) return;
+  const pick = (value, len) => String(value ?? "").slice(0, len);
+  const geo = {
+    country: pick(d.country, 20),
+    province: pick(d.prov, 40),
+    city: pick(d.city, 40),
+    isp: pick(d.isp, 60),
+    lon: pick(d.lon, 20),
+    lat: pick(d.lat, 20),
+  };
+  if (!geo.country && !geo.province && !geo.city && !geo.isp) return;
 
   try {
     await db
       .prepare(
-        `UPDATE ${VISITOR_TABLE} SET country = ?, province = ?, city = ?, isp = ?, lon = ?, lat = ? WHERE visitor = ?`,
+        `UPDATE ${VISITOR_TABLE}
+            SET country = ?, province = ?, city = ?, isp = ?, lon = ?, lat = ?
+          WHERE visitor = ?`,
       )
-      .bind(country, province, city, isp, lon, lat, visitor)
+      .bind(
+        geo.country,
+        geo.province,
+        geo.city,
+        geo.isp,
+        geo.lon,
+        geo.lat,
+        visitor,
+      )
       .run();
   } catch {
     // 同上，写失败就算了
@@ -235,12 +222,15 @@ export async function handleReport(c) {
   const now = new Date().toISOString();
   const { visitor, ip } = await buildVisitorId(c.req.raw);
   const { device, os, browser } = parseUa(ua);
-  // Cloudflare 边缘带上来的国家代码，本地开发没有这个值
-  const country = c.req.raw.cf?.country || c.req.header("cf-ipcountry") || "";
+  // Cloudflare 边缘带上来的国家代码，只作为归属地查不到时的兜底
+  const cfCountry = c.req.raw.cf?.country || c.req.header("cf-ipcountry") || "";
 
-  // 新访客、或老记录还缺省市的，事后补一次归属地（不阻塞这次响应）
+  // 先读旧记录：决定要不要补归属地，同时给下面判定「上次是什么时候来的」用
   const existing = await db
-    .prepare(`SELECT province, country FROM ${VISITOR_TABLE} WHERE visitor = ?`)
+    .prepare(
+      `SELECT country, province, lon, last_seen
+         FROM ${VISITOR_TABLE} WHERE visitor = ?`,
+    )
     .bind(visitor)
     .first();
 
@@ -258,6 +248,7 @@ export async function handleReport(c) {
            ON CONFLICT(path) DO UPDATE SET pv = pv + 1, updated_at = excluded.updated_at`,
         )
         .bind(path, now),
+      // country 只在还没值时用边缘国家码兜底，否则会把 geo 查到的中文名覆盖成两位码
       db
         .prepare(
           `INSERT INTO ${VISITOR_TABLE}
@@ -267,7 +258,9 @@ export async function handleReport(c) {
              last_seen = excluded.last_seen,
              last_path = excluded.last_path,
              ip = excluded.ip,
-             country = excluded.country,
+             country = CASE WHEN ${VISITOR_TABLE}.country = ''
+                            THEN excluded.country
+                            ELSE ${VISITOR_TABLE}.country END,
              device = excluded.device,
              os = excluded.os,
              browser = excluded.browser,
@@ -278,7 +271,7 @@ export async function handleReport(c) {
           now,
           now,
           ip,
-          country,
+          cfCountry,
           device,
           os,
           browser,
@@ -290,14 +283,16 @@ export async function handleReport(c) {
     return c.json({ error: `统计写入失败：${error?.message || error}` }, 500);
   }
 
-  // 还没有省市、或 country 还是 Cloudflare 的两位码（老数据），都补一次
-  const needsGeo =
-    !existing ||
-    !existing.province ||
-    !existing.lon ||
-    /^[A-Z]{2}$/.test(String(existing.country || ""));
+  // 归属地不全才补：新访客直接查；老记录缺省市/经纬度时，一天最多重试一次，
+  // 否则上游一直查不到就会每次访问都外呼一遍
+  const hasGeo =
+    !!existing?.province &&
+    !!existing?.lon &&
+    !/^[A-Z]{2}$/.test(String(existing?.country || ""));
+  const lastSeenAt = Date.parse(existing?.last_seen || "") || 0;
+  const retryDue = !existing || Date.now() - lastSeenAt > GEO_RETRY_MS;
 
-  if (needsGeo) {
+  if (!hasGeo && retryDue) {
     const task = fillVisitorGeo(db, visitor, ip);
     try {
       c.executionCtx.waitUntil(task);
