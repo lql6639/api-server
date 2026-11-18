@@ -9,6 +9,13 @@ const SITE_TABLE = "stats_site";
 const PAGE_TABLE = "stats_pages";
 const VISITOR_TABLE = "stats_visitors";
 
+// 归属地数据源：
+//   ip9 走公网 HTTP（外部服务，能拿到区县和中文 ISP）
+//   ipinfo 只能进程内调用 —— Cloudflare 不允许 Worker 用 HTTP 调自己，
+//   试过 server.lovlin.cn 和 workers.dev 两个域名，都是 522
+const IP9_URL = "https://ip9.com.cn/get";
+const GEO_TIMEOUT_MS = 6000;
+
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS ${SITE_TABLE} (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -146,14 +153,19 @@ function readNumber(result) {
   return Number(row?.pv ?? row?.uv ?? 0) || 0;
 }
 
-// 归属地：优先 ip9.com.cn（能拿到区县），失败退回 ipinfo 的多上游容灾
-async function fetchGeoFromIp9(ip) {
-  const res = await fetch(
-    `https://ip9.com.cn/get?ip=${encodeURIComponent(ip)}`,
-    { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(6000) },
-  );
+// 拉 JSON 的小工具：超时 + 非 2xx 直接抛，交给 allSettled 兜
+async function fetchJson(url) {
+  const res = await fetch(url, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(GEO_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
+  return res.json();
+}
+
+// ip9：有区县、ISP 是中文
+async function fetchGeoFromIp9(ip) {
+  const json = await fetchJson(`${IP9_URL}?ip=${encodeURIComponent(ip)}`);
   const d = json?.data;
   if (!d) throw new Error("返回数据为空");
   return {
@@ -165,7 +177,8 @@ async function fetchGeoFromIp9(ip) {
   };
 }
 
-async function fetchGeoFallback(ip) {
+// 自己的 ipinfo 逻辑：城市粒度更准（多上游容灾）
+async function fetchGeoFromIpinfo(ip) {
   const info = await queryIpInfoWithRetry(ip);
   const d = info?.data || {};
   return {
@@ -177,32 +190,33 @@ async function fetchGeoFallback(ip) {
   };
 }
 
-// 只有新访客、或老记录还缺省市时才查一次，结果写回 visitor 行
+// 两个来源并发查，字段互补：
+//   省/市 用 ipinfo（粒度更准）、区县 用 ip9、国家/运营商 用 ip9（中文）
+// 只有新访客、或老记录还缺省市、或 country 仍是两位码时才查
 async function fillVisitorGeo(db, visitor, ip) {
-  let geo = null;
-  try {
-    geo = await fetchGeoFromIp9(ip);
-  } catch {
-    geo = null;
-  }
-  if (!geo || (!geo.province && !geo.city)) {
-    try {
-      geo = await fetchGeoFallback(ip);
-    } catch {
-      // 两个来源都失败就空着
-    }
-  }
-  if (!geo) return;
+  const [a, b] = await Promise.allSettled([
+    fetchGeoFromIp9(ip),
+    fetchGeoFromIpinfo(ip),
+  ]);
+  const ip9 = a.status === "fulfilled" ? a.value : null;
+  const ipinfo = b.status === "fulfilled" ? b.value : null;
+  if (!ip9 && !ipinfo) return;
 
-  const { country, province, city, area, isp } = geo;
-  if (!country && !province && !city && !area && !isp) return;
+  const geo = {
+    country: ip9?.country || ipinfo?.country || "",
+    province: ipinfo?.province || ip9?.province || "",
+    city: ipinfo?.city || ip9?.city || "",
+    area: ip9?.area || "",
+    isp: ip9?.isp || ipinfo?.isp || "",
+  };
+  if (!geo.country && !geo.province && !geo.city && !geo.area && !geo.isp) return;
 
   try {
     await db
       .prepare(
         `UPDATE ${VISITOR_TABLE} SET country = ?, province = ?, city = ?, area = ?, isp = ? WHERE visitor = ?`,
       )
-      .bind(country, province, city, area, isp, visitor)
+      .bind(geo.country, geo.province, geo.city, geo.area, geo.isp, visitor)
       .run();
   } catch {
     // 归属地查不到不影响统计本身
@@ -349,3 +363,4 @@ export const meta = {
     },
   ],
 };
+
