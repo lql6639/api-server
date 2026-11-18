@@ -22,8 +22,28 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS ${VISITOR_TABLE} (
     visitor TEXT PRIMARY KEY,
     first_seen TEXT NOT NULL DEFAULT '',
-    last_seen TEXT NOT NULL DEFAULT ''
+    last_seen TEXT NOT NULL DEFAULT '',
+    ip_prefix TEXT NOT NULL DEFAULT '',
+    country TEXT NOT NULL DEFAULT '',
+    device TEXT NOT NULL DEFAULT '',
+    os TEXT NOT NULL DEFAULT '',
+    browser TEXT NOT NULL DEFAULT '',
+    visits INTEGER NOT NULL DEFAULT 0,
+    first_path TEXT NOT NULL DEFAULT '',
+    last_path TEXT NOT NULL DEFAULT ''
   )`,
+];
+
+// 老库补列：CREATE TABLE IF NOT EXISTS 不会改动已存在的表
+const VISITOR_EXTRA_COLUMNS = [
+  ["ip_prefix", "TEXT NOT NULL DEFAULT ''"],
+  ["country", "TEXT NOT NULL DEFAULT ''"],
+  ["device", "TEXT NOT NULL DEFAULT ''"],
+  ["os", "TEXT NOT NULL DEFAULT ''"],
+  ["browser", "TEXT NOT NULL DEFAULT ''"],
+  ["visits", "INTEGER NOT NULL DEFAULT 0"],
+  ["first_path", "TEXT NOT NULL DEFAULT ''"],
+  ["last_path", "TEXT NOT NULL DEFAULT ''"],
 ];
 
 // 爬虫/预渲染/命令行 UA 不计入，避免污染数据
@@ -36,7 +56,43 @@ async function ensureSchema(db) {
   for (const statement of SCHEMA) {
     await db.prepare(statement).run();
   }
+  // 已存在的表不会因为 CREATE TABLE IF NOT EXISTS 而变结构，缺的列单独补
+  const { results } = await db
+    .prepare(`PRAGMA table_info(${VISITOR_TABLE})`)
+    .all();
+  const existing = new Set((results || []).map((row) => row.name));
+  for (const [name, def] of VISITOR_EXTRA_COLUMNS) {
+    if (!existing.has(name)) {
+      await db
+        .prepare(`ALTER TABLE ${VISITOR_TABLE} ADD COLUMN ${name} ${def}`)
+        .run();
+    }
+  }
   schemaReady = true;
+}
+
+// 从 UA 里扒设备 / 系统 / 浏览器，够看就行，不引第三方库
+function parseUa(ua) {
+  const s = String(ua || "");
+  const isTablet = /iPad|Tablet/i.test(s);
+  const isMobile = /Mobile|Android|iPhone|iPod|HarmonyOS|Windows Phone/i.test(s);
+  const device = isTablet ? "tablet" : isMobile ? "mobile" : "desktop";
+
+  let os = "其它";
+  if (/Windows NT/i.test(s)) os = "Windows";
+  else if (/iPhone|iPad|iPod/i.test(s)) os = "iOS";
+  else if (/Mac OS X/i.test(s)) os = "macOS";
+  else if (/Android/i.test(s)) os = "Android";
+  else if (/Linux/i.test(s)) os = "Linux";
+
+  let browser = "其它";
+  if (/Edg\//i.test(s)) browser = "Edge";
+  else if (/OPR\/|Opera/i.test(s)) browser = "Opera";
+  else if (/Firefox\//i.test(s)) browser = "Firefox";
+  else if (/Chrome\/|CriOS/i.test(s)) browser = "Chrome";
+  else if (/Safari\//i.test(s)) browser = "Safari";
+
+  return { device, os, browser };
 }
 
 // 统一成站内相对路径，避免把整条带参数的 URL 记成不同页面
@@ -65,9 +121,11 @@ async function buildVisitorId(request) {
     "SHA-256",
     new TextEncoder().encode(`koizora|${prefix}|${ua}`),
   );
-  return Array.from(new Uint8Array(digest).slice(0, 12))
+  const visitor = Array.from(new Uint8Array(digest).slice(0, 12))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+  // 只留网段，不存完整 IP，能看出大致来源又不至于精确到个人
+  return { visitor, ipPrefix: prefix };
 }
 
 function readNumber(result) {
@@ -130,7 +188,11 @@ export async function handleReport(c) {
   }
   const path = normalizePath(body?.path ?? c.req.query("path"));
   const now = new Date().toISOString();
-  const visitor = await buildVisitorId(c.req.raw);
+  const { visitor, ipPrefix } = await buildVisitorId(c.req.raw);
+  const { device, os, browser } = parseUa(ua);
+  // Cloudflare 边缘带上来的国家代码，本地开发没有这个值
+  const country =
+    c.req.raw.cf?.country || c.req.header("cf-ipcountry") || "";
 
   try {
     await db.batch([
@@ -148,10 +210,19 @@ export async function handleReport(c) {
         .bind(path, now),
       db
         .prepare(
-          `INSERT INTO ${VISITOR_TABLE} (visitor, first_seen, last_seen) VALUES (?, ?, ?)
-           ON CONFLICT(visitor) DO UPDATE SET last_seen = excluded.last_seen`,
+          `INSERT INTO ${VISITOR_TABLE}
+             (visitor, first_seen, last_seen, ip_prefix, country, device, os, browser, visits, first_path, last_path)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+           ON CONFLICT(visitor) DO UPDATE SET
+             last_seen = excluded.last_seen,
+             last_path = excluded.last_path,
+             country = excluded.country,
+             device = excluded.device,
+             os = excluded.os,
+             browser = excluded.browser,
+             visits = visits + 1`,
         )
-        .bind(visitor, now, now),
+        .bind(visitor, now, now, ipPrefix, country, device, os, browser, path, path),
     ]);
   } catch (error) {
     return c.json({ error: `统计写入失败：${error?.message || error}` }, 500);
