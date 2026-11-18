@@ -12,6 +12,14 @@ const VISITOR_TABLE = "stats_visitors";
 // 归属地查不到时的重试间隔：太短会每次访问都外呼一次，太长又补不上
 const GEO_RETRY_MS = 24 * 60 * 60 * 1000;
 
+// 时间统一按东八区存，形如 2026-11-19T04:01:48+08:00。
+// 必须带 +08:00：不带偏移的字符串会被各运行时按自己的时区解释，
+// Worker 跑在 UTC 下会把 04:01 当成 UTC，凭空产生 8 小时偏差。
+function nowInChina() {
+  const shifted = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  return shifted.toISOString().replace(/\.\d{3}Z$/, "+08:00");
+}
+
 // 建表语句只对空库生效，已存在的表不会被改成这里的结构。
 // 要改表结构就手动在远程库迁移（ALTER / 重建），不在这里维护第二份列定义。
 const SCHEMA = [
@@ -219,7 +227,7 @@ export async function handleReport(c) {
     body = {};
   }
   const path = normalizePath(body?.path ?? c.req.query("path"));
-  const now = new Date().toISOString();
+  const now = nowInChina();
   const { visitor, ip } = await buildVisitorId(c.req.raw);
   const { device, os, browser } = parseUa(ua);
   // Cloudflare 边缘带上来的国家代码，只作为归属地查不到时的兜底
