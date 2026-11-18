@@ -45,7 +45,8 @@ function normalizePath(value) {
   if (!raw) return "/";
   let path = raw;
   try {
-    path = new URL(raw, "https://koizora.lovlin.cn").pathname;
+    // 第二个参数只是解析相对路径用的基准，域名填什么都不影响结果（下面只取 pathname）
+    path = new URL(raw, "https://blog.lovlin.cn").pathname;
   } catch {
     path = raw.split(/[?#]/)[0];
   }
