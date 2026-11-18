@@ -3,6 +3,7 @@
 // UV 口径：IPv4 取 /24、IPv6 取 /48 后与 UA 拼接做 SHA-256，同一网段同一 UA 视为同一访客。
 
 import { getClientIp, isIP, ipv4Prefix24, ipv6Prefix48 } from "../lib/ip.js";
+import { queryIpInfoWithRetry } from "./ipinfo.js";
 
 const SITE_TABLE = "stats_site";
 const PAGE_TABLE = "stats_pages";
@@ -25,6 +26,9 @@ const SCHEMA = [
     last_seen TEXT NOT NULL DEFAULT '',
     ip_prefix TEXT NOT NULL DEFAULT '',
     country TEXT NOT NULL DEFAULT '',
+    province TEXT NOT NULL DEFAULT '',
+    city TEXT NOT NULL DEFAULT '',
+    isp TEXT NOT NULL DEFAULT '',
     device TEXT NOT NULL DEFAULT '',
     os TEXT NOT NULL DEFAULT '',
     browser TEXT NOT NULL DEFAULT '',
@@ -38,6 +42,9 @@ const SCHEMA = [
 const VISITOR_EXTRA_COLUMNS = [
   ["ip_prefix", "TEXT NOT NULL DEFAULT ''"],
   ["country", "TEXT NOT NULL DEFAULT ''"],
+  ["province", "TEXT NOT NULL DEFAULT ''"],
+  ["city", "TEXT NOT NULL DEFAULT ''"],
+  ["isp", "TEXT NOT NULL DEFAULT ''"],
   ["device", "TEXT NOT NULL DEFAULT ''"],
   ["os", "TEXT NOT NULL DEFAULT ''"],
   ["browser", "TEXT NOT NULL DEFAULT ''"],
@@ -133,6 +140,26 @@ function readNumber(result) {
   return Number(row?.pv ?? row?.uv ?? 0) || 0;
 }
 
+// 补归属地：只有新访客、或老记录还缺省市时才查一次，结果写回 visitor 行
+async function fillVisitorGeo(db, visitor, ip) {
+  try {
+    const info = await queryIpInfoWithRetry(ip);
+    const d = info?.data || {};
+    const province = String(d.prov || "").slice(0, 40);
+    const city = String(d.city || "").slice(0, 40);
+    const isp = String(d.isp || "").slice(0, 60);
+    if (!province && !city && !isp) return;
+    await db
+      .prepare(
+        `UPDATE ${VISITOR_TABLE} SET province = ?, city = ?, isp = ? WHERE visitor = ?`,
+      )
+      .bind(province, city, isp, visitor)
+      .run();
+  } catch {
+    // 归属地查不到不影响统计本身
+  }
+}
+
 async function readStats(db, path) {
   const statements = [
     db.prepare(`SELECT pv FROM ${SITE_TABLE} WHERE id = 1`),
@@ -194,6 +221,12 @@ export async function handleReport(c) {
   const country =
     c.req.raw.cf?.country || c.req.header("cf-ipcountry") || "";
 
+  // 新访客、或老记录还缺省市的，事后补一次归属地（不阻塞这次响应）
+  const existing = await db
+    .prepare(`SELECT province FROM ${VISITOR_TABLE} WHERE visitor = ?`)
+    .bind(visitor)
+    .first();
+
   try {
     await db.batch([
       db
@@ -226,6 +259,16 @@ export async function handleReport(c) {
     ]);
   } catch (error) {
     return c.json({ error: `统计写入失败：${error?.message || error}` }, 500);
+  }
+
+  if (!existing || !existing.province) {
+    const task = fillVisitorGeo(db, visitor, getClientIp(c.req.raw));
+    try {
+      c.executionCtx.waitUntil(task);
+    } catch {
+      // 没有 executionCtx（例如测试里直接调用）就让它自己跑完，失败也无妨
+      task.catch(() => {});
+    }
   }
 
   c.header("Cache-Control", "no-store");
