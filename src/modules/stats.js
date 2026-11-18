@@ -178,7 +178,8 @@ async function fillVisitorGeo(db, visitor, ip) {
 async function readStats(db, path) {
   const statements = [
     db.prepare(`SELECT pv FROM ${SITE_TABLE} WHERE id = 1`),
-    db.prepare(`SELECT COUNT(*) AS uv FROM ${VISITOR_TABLE}`),
+    // site_uv 按需求返回「访问次数合计」（visits 相加），不是独立访客数
+    db.prepare(`SELECT COALESCE(SUM(visits), 0) AS uv FROM ${VISITOR_TABLE}`),
   ];
   if (path) {
     statements.push(

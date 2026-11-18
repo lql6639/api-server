@@ -87,6 +87,6 @@ fetch('https://server.lovlin.cn/v1/stats', {
 | --------------- | ---------------------------------------- |
 | `stats_site`    | 站点累计 PV（单行，`id = 1`）            |
 | `stats_pages`   | 按路径累计 PV                            |
-| `stats_visitors`| 访客哈希去重表，UV = `COUNT(*)`          |
+| `stats_visitors`| 访客表（一人一行），`site_uv` = `SUM(visits)`   |
 
 首次访问时自动建表，无需手动初始化。
